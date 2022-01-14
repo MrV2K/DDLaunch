@@ -1,0 +1,224 @@
+About
+-----
+
+DDLaunch is a frontend for DamienD's collection of Amiga games. It was designed to
+remove the need to use the WinUAE interface to start the games. It also adds
+filters and a bit of extra functionality as well.
+
+Installation
+------------
+
+In the archive there are 32 and 64bit versions of the the executable which you can
+install depending on your OS. The DDLaunch file needs to be put in the WinUAE
+folder that was extracted from the DamienD collection archives.
+
+When you launch the program for the first time, it will create a database of the
+game folder and process the configuration files to make them compatible with the
+launcher. These are stored in DD_CONFIGS.dat and DD_DB.dat which are saved in the
+WinUAE folder. This process will take a few minutes.
+
+Optional Files
+--------------
+
+DDlaunch has a built in PDF viewer. For this to work properly you will need to
+install Adobe Acrobat, FoxIt Pro or equivalent web plugin. If they are not
+installed, the window will show a download popup and open the file in your default
+PDF reader. 
+
+Main Window
+-----------
+
+The main window is split into two sections, the game list and the media panel.
+
+** Game List **
+In the game list you will see the list of installed games. To run a game, just
+double click it. You can also right click anywhere on the DDLaunch window and a
+popup menu will appear which also allows you to run the game, open the game folder
+or access any documentation that is in the game folder.
+
+** Filter **
+This drop-down menu allows you to filter the games list by category. Also,
+pressing F10 will open a search window.
+
+** Floppy Speed **
+A lot of the games are run off of an emulated floppy disk. This option allows you
+to change the speed of the floppy drive.
+
+** Media Panel **
+In this panel you will see any game art supplied in the collection. You can
+double click any of the panels to open them in a larger window. Double clicking
+or pressing Escape will close the zoomed picture.
+
+If the game has any extra documentation, you will see a document icon in the top
+right corner of the cover art panel. Use the popup menu to access these documents.
+
+Menus
+-----
+
+** File **
+Run Game		- Launches the currently selected game.
+Open Game Folder	- Opens the folder for selected game.
+Search Database		- Opens a window to allow you to search the database.
+Refresh Database	- Clears and rescans the configuration data.
+Quit			- Quits DDLaunch
+
+** Options **
+Show WinUAE GUI 	- Opens WinUAE with the game selected. This allows you to
+			  change any settings.
+WinUAE Screen 		- Allows you to choose how WinUAE displays the game. You
+			  can pick between Full Screen, Full Window or Windowed.
+Stretch Window 		- Expands the GUI vertically to the full desktop height.
+Compact/Wide Window 	- Changes the layout of the GUI
+Box Art Outline Col 	- Changes the outline colour of the boxart image
+Save Settings 		- Saves the current settings
+
+** Help **
+About 			- DDLaunch info.
+Help 			- Shows this file.
+
+Keyboard Shortcuts
+------------------
+
+** GUI Keys **
+F1  			- Zoom Title Image
+F2  			- Zoom Game Image
+F3  			- Zoom Box Art
+F4  			- Open Game Folder
+F5  			- Refresh Database
+F10 			- Search
+F12 			- Help
+Enter 			- Run Game
+Ctrl & Q 		- Quit
+Crtl & +/- 		- Zoom File Viewer
+
+** WinUAE Keys **
+Ctrl & F11        	- Quit
+End & 1-9         	- Swap Disk
+End 7 Pause/Break 	- Turbo Mode
+F12               	- Settings
+
+Version History
+---------------
+
+ v0.1 
+ ----
+ Initial Release
+
+ v0.2
+ ----
+ 1. Removed graphics options from process procedure.
+ 2. Switched to BriefLZ packer.
+ 3. Compressed Config Files Into .dat file (saved 25MB).
+ 4. Removed console.
+ 5. Fixed image drawing with no list entries.
+ 6. Updated filter (Reflection Keen).
+ 
+ v0.3
+ ----
+ 1. Added support for text & pdf files via popup menu.
+ 2. Reduced window size.
+ 3. Added slider for floppy speed.
+ 4. Updated filters (D1X Rebirth, Apple IIGS, MSX, Exult, OCS/ECS).
+ 5. Added show WinUAE gui button.
+ 6. Window will stretch to screen height.
+ 7. Window Title shows how many game are in the main list.
+
+ v0.4
+ ----
+ 1. Added tabs to media panel.
+ 2. Supports Box Art images.
+ 3. Support for JPEG images.
+ 4. Support for text based info files (___Info.txt).
+ 5. Added prefs file for saving options.
+ 6. Fixed bug in popup menu.
+ 7. Fixed bug in config creation.
+
+ v0.5
+ ----
+ 1. Added Wide Layout.
+
+ v0.6
+ ----
+ 1. Added scaling to box art gadget to show the correct aspect ratio of
+    images.
+ 2. Reworked main screen scaling to go as low as 720p.
+ 3. Popup Image corrects aspect ratio of images.
+ 4. Removed Image labels and added to About window.
+ 5. Updated the icon!
+ 6. Tweaked the sort which is now based on config names
+ 7. Had a play with the processing window
+ 8. Refresh database clears the images and info text
+
+ v0.7
+ ----
+ 1. Changed sort to match WinUAE
+
+ v0.8
+ ----
+ 1. Added full window support
+ 2. Fixed aspect of game cover image
+ 3. Fixed compact mode DPI scaling
+ 4. Fixed stretch vertical window scaling
+ 5. Fixed a crash when starting outside of the DD WinUAE folder
+ 6. Added save settings to menu
+ 7. Added load game splash screen
+ 8. Fixed bug in floppy speed slider
+ 9. Added floppy speed to prefs file
+ 10. Removed game info box and support
+ 11. Added quit confirmation to close window button
+ 12. Added menu item to switch off close confirmation and added to prefs
+ 
+ v0.9
+ ----
+ 1. Added cover image outline
+ 2. Added menu option to select cover image outline colour
+ 3. Cover image outline colour saved in prefs
+ 4. Added menu option to open game folder
+ 5. Added icon to cover art panel to show if documents are present
+ 6. Added built in PDF viewer
+ 7. Added built in text viewer
+ 8. Added windowed mode to WinUAE settings which is saved in prefs
+ 9. Restructured menus
+ 10. Fixed outline box drawing (DPI issue) on zoom window
+ 11. Fixed aspect ratio and scanlines on full window screens
+ 
+ v0.91
+ -----
+ 1. Added MSX2 conversion to filter
+ 2. Fixed PDFViewer Window resize
+ 3. Fixed screen offset on full window screens
+ 
+ v0.92
+ -----
+ 1. Fixed RTG scaling on full window mode
+ 2. Fixed bug in text viewer with non ascii characters
+ 3. Added resize to text viewer and increased it's default width.
+ 
+ v1.0 - Full Release
+ -------------------
+ 1. Removed program wait on procedure Run_Game and added threaded cleanup process.
+ 2. Added check to prevent starting two WinUAE processes.
+ 
+ v1.1
+ -----
+ 1. Tweaked list sorting.
+ 2. Added menu item to select between original names or new names. Saves in prefs.
+ 3. Added a few more filters.
+ 
+ v1.2
+ -----
+ 1. Close confirm defaults to false
+ 2. Tweaked the sort... again...
+ 3. Media panels centre vertically on stretch
+ 4. Stretch GUI now gives a buffer of 5 pixels top and bottom.
+ 5. Cover images maintain aspect ratios and now reduce width if necessary.
+ 6. Cover image popup window scales to images and maintains aspect ratio.
+ 7. Combined the text & pdf viewers by using a browser based gadget.
+ 8. DDLaunch allows 10 file view windows at any one time. A check prevents more to
+    be opened.
+ 9. Converted DDLaunch.txt to be 80 columns.
+ 10. Added support for png and jpg images to the file viewer and popup menu.
+ 11. Popup menu now supports up to 30 files.
+ 12. Moved configuration folder check to prevent any files being created if there
+     was an error.
+
