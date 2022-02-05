@@ -134,6 +134,12 @@
 ; v1.3
 ; -----
 ; 1. Main window is no longer disabled when running a game.
+; 2. Replaced protected gadget variables.
+; 3. Removed SmartWindowRefresh as it corrupts gadgets on Windows 11.
+; 4. Tweaked gadget drawing.
+; 5. Removed unnecessary font load.
+; 6. Removed AmiDuke from filter
+; 7. Added JFDuke3d, Sharp X6800 conversion and PET version to the filter.
 
 EnableExplicit
 
@@ -142,6 +148,16 @@ EnableExplicit
 Enumeration
   
   #MAIN_WINDOW
+  #MAIN_FILTER
+  #MAIN_LIST
+  #MAIN_FLOPPY
+  #MAIN_PANEL
+  #FLOPPY_FRAME
+  #FILTER_FRAME
+  #TITLE_GADGET
+  #SCREENSHOT_GADGET
+  #BOXART_GADGET
+  
   #MEDIA_CONTAINER
   #POPUP_WINDOW
   #PROGRESS_WINDOW
@@ -169,6 +185,7 @@ Enumeration
   #IFF_IMAGE
   #IFF_BLANK
   #IFF_POPUP
+  
   #PDF_IMAGE
   #TEXT_IMAGE
   #BUB_IMAGE
@@ -176,16 +193,15 @@ Enumeration
   #DOC_IMAGE
   #FOLDER_IMAGE
   #SEARCH_IMAGE
-  #REFRESH_IMAGE
+  #REFRESH_IMAGE  
   #INFO_IMAGE
   #HELP_IMAGE
   #CLOSE_IMAGE
   #IMAGE_IMAGE
+  
   #MAIN_MENU
   #POPUP_MENU
   #DUMMY_MENU
-  #INFO_FONT
-  #LIST_FONT
   
 EndEnumeration
 
@@ -243,11 +259,10 @@ EndEnumeration
 
 ;- **** Global Variables ****
 
-Global W_Title.s="DDLaunch v1.2"
+Global W_Title.s="DDLaunch v1.3"
 
-Global event.i, count.i, i.i, path.s, Image_Landscape.b, Box_Title.i, Window_Type.b, Program.i
-Global Main_List.i, Main_Filter.i, Floppy_Text.i, Floppy_Slider.i, Title_Image.i, ScreenShot_Image.i, Filter_Title.i, Docs_Text.i
-Global Docs_Text2.i, Main_Panel.i, Boxart_Image.i
+Global event.i, count.i, i.i, path.s, Window_Type.b, Program.i
+Global Docs_Text.i, Docs_Text2.i
 
 Global Home_Path.s=GetCurrentDirectory()
 Global WinUAE_Path.s=Home_Path+"winuae.exe"
@@ -312,7 +327,7 @@ Structure DD_Data
   DD_CDoom.b
   DD_JFSW.b
   DD_Build.b
-  DD_AmiDuke.b
+  DD_JFDuke.b
   DD_AmiSpear.b
   DD_AmiWolf.b
   DD_Tyrian.b
@@ -327,6 +342,8 @@ Structure DD_Data
   DD_4MB.b
   DD_Filtered.b
   DD_X360.b
+  DD_X68k.b
+  DD_Pet.b
 EndStructure
 
 Structure UData
@@ -378,8 +395,8 @@ EndMacro
 
 Macro Get_Game_Number()
   
-  If GetGadgetState(Main_List)>-1
-    SelectElement(List_Numbers(),GetGadgetState(Main_List))
+  If GetGadgetState(#MAIN_LIST)>-1
+    SelectElement(List_Numbers(),GetGadgetState(#MAIN_LIST))
     SelectElement(DD_List(),List_Numbers())
   EndIf
   
@@ -616,10 +633,6 @@ Procedure.s Title_Extras()
     extras+" [Reflection Keen]"
   EndIf
   
-  If DD_List()\DD_AmiDuke
-    extras+" [AmiDuke]"
-  EndIf
-  
   If DD_List()\DD_Tyrian
     extras+" [Open Tyrian]"
   EndIf
@@ -692,6 +705,18 @@ Procedure.s Title_Extras()
     extras+" [Prototype]"
   EndIf
   
+  If DD_List()\DD_X68k
+    extras+" [Sharp X68000 Conversion]"
+  EndIf
+  
+  If DD_List()\DD_JFDuke
+    extras+" [JFDuke3D]"
+  EndIf
+  
+  If DD_List()\DD_Pet
+    extras+" [PET Version]"
+  EndIf
+  
   ProcedureReturn extras
   
 EndProcedure
@@ -700,7 +725,7 @@ Procedure Filter_List()
   
   Protected filter.s
   
-  filter=GetGadgetItemText(Main_Filter,GetGadgetState(Main_Filter))
+  filter=GetGadgetItemText(#MAIN_FILTER,GetGadgetState(#MAIN_FILTER))
   
   ForEach DD_List() 
     
@@ -744,14 +769,15 @@ Procedure Filter_List()
       Case "Conversion (MSX2)" : DD_List()\DD_Filtered=DD_List()\DD_MSX2
       Case "Conversion (Apple IIGS)" : DD_List()\DD_Filtered=DD_List()\DD_AppleII
       Case "Conversion (Sega CD)" : DD_List()\DD_Filtered=DD_List()\DD_SegaCD
+      Case "Conversion (Sharp X68000)" : DD_List()\DD_Filtered=DD_List()\DD_X68k
       Case "ZDoom" : DD_List()\DD_Filtered=DD_List()\DD_ZDoom
       Case "Chocolate Doom" : DD_List()\DD_Filtered=DD_List()\DD_CDoom
-      Case "AmiDuke" : DD_List()\DD_Filtered=DD_List()\DD_AmiDuke
       Case "Reflection Keen" : DD_List()\DD_Filtered=DD_List()\DD_Keen
       Case "AmiSpear" : DD_List()\DD_Filtered=DD_List()\DD_AmiSpear
       Case "AmiWolf" : DD_List()\DD_Filtered=DD_List()\DD_AmiWolf
       Case "Exult" : DD_List()\DD_Filtered=DD_List()\DD_Exult
       Case "JFSW" : DD_List()\DD_Filtered=DD_List()\DD_JFSW
+      Case "JFDuke3D" : DD_List()\DD_Filtered=DD_List()\DD_JFDuke
       Case "Build Game" : DD_List()\DD_Filtered=DD_List()\DD_Build
       Case "Open Tyrian" : DD_List()\DD_Filtered=DD_List()\DD_Tyrian
       Case "D1X Rebirth" : DD_List()\DD_Filtered=DD_List()\DD_D1X
@@ -762,6 +788,7 @@ Procedure Filter_List()
       Case "Prototype" : DD_List()\DD_Filtered=DD_List()\DD_Prototype
       Case "2MB RAM" : DD_List()\DD_Filtered=DD_List()\DD_2MB
       Case "4MB RAM" : DD_List()\DD_Filtered=DD_List()\DD_4MB
+      Case "PET Version" : DD_List()\DD_Filtered=DD_List()\DD_Pet
     EndSelect
     
     If search_name<>""
@@ -815,7 +842,7 @@ Procedure Draw_Info()
   
   Get_Game_Number()
   
-  If IsGadget(Main_Panel) : Pause_Gadget(Main_Panel) : EndIf
+  If IsGadget(#MAIN_PANEL) : Pause_Gadget(#MAIN_PANEL) : EndIf
   
   If IsImage(#IFF_IMAGE) : FreeImage(#IFF_IMAGE) : EndIf
   
@@ -868,9 +895,9 @@ Procedure Draw_Info()
   EndIf
   
   If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(Title_Image))-4, DpiY(GadgetHeight(Title_Image))-4,#PB_Image_Smooth)
-    StartDrawing(CanvasOutput(Title_Image))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(Title_Image))-4, DpiY(GadgetHeight(Title_Image))-4)
+    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4,#PB_Image_Smooth)
+    StartDrawing(CanvasOutput(#TITLE_GADGET))
+    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
     StopDrawing()
   EndIf
   
@@ -889,9 +916,9 @@ Procedure Draw_Info()
   EndIf
   
   If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(ScreenShot_Image))-4, DpiY(GadgetHeight(ScreenShot_Image))-4,#PB_Image_Smooth)
-    StartDrawing(CanvasOutput(ScreenShot_Image))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(ScreenShot_Image))-4, DpiY(GadgetHeight(ScreenShot_Image))-4)
+    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#SCREENSHOT_GADGET))-4, DpiY(GadgetHeight(#SCREENSHOT_GADGET))-4,#PB_Image_Smooth)
+    StartDrawing(CanvasOutput(#SCREENSHOT_GADGET))
+    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#SCREENSHOT_GADGET))-4, DpiY(GadgetHeight(#SCREENSHOT_GADGET))-4)
     StopDrawing()
   EndIf
   
@@ -913,9 +940,9 @@ Procedure Draw_Info()
   
   If Compact_Layout
     box_x=4
-    box_w=GetGadgetAttribute(Main_Panel,#PB_Panel_ItemWidth)-8
+    box_w=GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8
     scale=box_w/ImageWidth(#IFF_IMAGE)
-    x_size=GetGadgetAttribute(Main_Panel,#PB_Panel_ItemHeight)-94
+    x_size=GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemHeight)-94
     If Int(ImageHeight(#IFF_IMAGE)*scale)>x_size
       offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
       If offset<0 : offset=0 : EndIf
@@ -928,7 +955,7 @@ Procedure Draw_Info()
     box_x=812
     box_w=350
     scale=box_w/ImageWidth(#IFF_IMAGE)
-    x_size=GadgetHeight(Boxart_Image)
+    x_size=GadgetHeight(#BOXART_GADGET)
     If Int(ImageHeight(#IFF_IMAGE)*scale)>550
       offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
       img_height=x_size
@@ -940,18 +967,18 @@ Procedure Draw_Info()
   
   If IsImage(#IFF_IMAGE)
     img_height=(DpiY(ImageHeight(#IFF_IMAGE))-4)*scale
-    img_width=DpiX(GadgetWidth(Boxart_Image)-4)
-    If img_height>DpiY(GadgetHeight(Boxart_Image))
-      ResizeImgAR(#IFF_IMAGE,DpiX(GadgetWidth(Boxart_Image))-4,DpiY(GadgetHeight(Boxart_Image)-6))
+    img_width=DpiX(GadgetWidth(#BOXART_GADGET)-4)
+    If img_height>DpiY(GadgetHeight(#BOXART_GADGET))
+      ResizeImgAR(#IFF_IMAGE,DpiX(GadgetWidth(#BOXART_GADGET))-4,DpiY(GadgetHeight(#BOXART_GADGET)-6))
       y=0
-      x=(DpiY(GadgetWidth(Boxart_Image))-ImageWidth(#IFF_IMAGE))/2
+      x=(DpiY(GadgetWidth(#BOXART_GADGET))-ImageWidth(#IFF_IMAGE))/2
     Else
       ResizeImage(#IFF_IMAGE,img_width, img_height,#PB_Image_Smooth)
       x=0
-      y=(DpiY(GadgetHeight(Boxart_Image))-ImageHeight(#IFF_IMAGE))/2
+      y=(DpiY(GadgetHeight(#BOXART_GADGET))-ImageHeight(#IFF_IMAGE))/2
     EndIf
-    StartDrawing(CanvasOutput(Boxart_Image))
-    Box(0,0,DpiX(GadgetWidth(Boxart_Image)),DpiY(GadgetHeight(Boxart_Image)),#Black)
+    StartDrawing(CanvasOutput(#BOXART_GADGET))
+    Box(0,0,DpiX(GadgetWidth(#BOXART_GADGET)),DpiY(GadgetHeight(#BOXART_GADGET)),#Black)
     
     
     If x<0 : x=0 : EndIf
@@ -971,7 +998,7 @@ Procedure Draw_Info()
   DrawText(0,0,"No Image")
   StopDrawing()
   
-  If IsGadget(Main_Panel) : Resume_Gadget(Main_Panel) : EndIf
+  If IsGadget(#MAIN_PANEL) : Resume_Gadget(#MAIN_PANEL) : EndIf
   
   SetWindowTitle(#MAIN_WINDOW,W_Title+" - Showing ("+Str(ListSize(List_Numbers()))+" of "+Str(ListSize(DD_List()))+" Games)")
   
@@ -984,6 +1011,8 @@ Procedure Cleanup(nul)
   While ProgramRunning(Program)
   Wend
   
+  CloseWindow(#RUN_WINDOW)
+  
   DeleteFile(GetTemporaryDirectory()+DD_List()\DD_Config)
   
   CloseProgram(Program)
@@ -994,7 +1023,7 @@ Procedure Run_Game()
   
   Protected old_pos.i, floppy.s, gui.s, config.s, full_path.s, params.s
   
-  old_pos=GetGadgetState(Main_List)
+  old_pos=GetGadgetState(#MAIN_LIST)
   
   OpenWindow(#RUN_WINDOW,0,0,360,60,"Starting WinUAE. Please Wait...",#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
   TextGadget(#PB_Any,70,15,280,50,"Loading: "+DD_List()\DD_Name,#PB_Text_Center)
@@ -1048,11 +1077,11 @@ Procedure Run_Game()
   
   CreateThread(@Cleanup(),0)
   
-  Delay(2000)
+  Delay(1500)
   
-  CloseWindow(#RUN_WINDOW)
+  HideWindow(#RUN_WINDOW,#True)
   
-  SetGadgetState(Main_List,old_pos)
+  SetGadgetState(#MAIN_LIST,old_pos)
   
   Get_Game_Number()
   
@@ -1135,7 +1164,7 @@ Procedure Image_Popup(type.i)
       CloseWindow(#POPUP_WINDOW)
       FreeImage(#IFF_POPUP)
       DisableWindow(#MAIN_WINDOW,#False)
-      SetActiveGadget(Main_List)
+      SetActiveGadget(#MAIN_LIST)
       
     EndIf
   EndIf
@@ -1387,12 +1416,12 @@ Procedure Draw_Main_Window()
   winheight=DesktopUnscaledY(GetMaxWindowHeight())
   
   If Stretch_Window
-    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 5, winwidth , winheight-10 , W_Title , #PB_Window_SystemMenu|#PB_Window_MinimizeGadget|#PB_Window_Invisible)
+    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 5, winwidth , winheight-10 , W_Title , #PB_Window_SystemMenu | #PB_Window_Invisible | #PB_Window_MinimizeGadget)
   Else 
-    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 0, winwidth , 591 , W_Title , #PB_Window_SystemMenu|#PB_Window_MinimizeGadget|#PB_Window_Invisible|#PB_Window_ScreenCentered)
+    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 0, winwidth , 591 , W_Title , #PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible | #PB_Window_ScreenCentered)
   EndIf
   
-  ;SmartWindowRefresh(#MAIN_WINDOW,#True)
+  Pause_Window(#MAIN_WINDOW)
   
   CreatePopupMenu(#DUMMY_MENU)
   
@@ -1440,138 +1469,142 @@ Procedure Draw_Main_Window()
   AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F12,#MenuItem_16)  
   SetMenuItemState(#MAIN_MENU,#MenuItem_6,Show_GUI)
   SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
+  
   Select Window_Type
     Case 1 : SetMenuItemState(#MAIN_MENU,#MenuItem_14,Window_Type)
     Case 2 : SetMenuItemState(#MAIN_MENU,#MenuItem_9,Window_Type)
     Case 3 : SetMenuItemState(#MAIN_MENU,#MenuItem_15,Window_Type)
   EndSelect
+  
   SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
   
   If Compact_Layout
     
-    Main_List = ListIconGadget(#PB_Any, 4,4,500,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
+    ListIconGadget(#MAIN_LIST, 4,4,500,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
     
     y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-564)/2
     
-    Main_Panel= PanelGadget(#PB_Any,508, y ,360, 564)
+    PanelGadget(#MAIN_PANEL,508, y ,360, 564)
     
-    AddGadgetItem(Main_Panel,-1,"Screen Shots")
+    AddGadgetItem(#MAIN_PANEL,-1,"Screen Shots")
     
-    Title_Image = CanvasGadget(#PB_Any, 4, 6, GetGadgetAttribute(Main_Panel,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
+    CanvasGadget(#TITLE_GADGET, 4, 6, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
     
-    ScreenShot_Image = CanvasGadget(#PB_Any, 4, 272, GetGadgetAttribute(Main_Panel,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
+    CanvasGadget(#SCREENSHOT_GADGET, 4, 272, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
     
-    AddGadgetItem(Main_Panel,-1,"BoxArt / Info")
+    AddGadgetItem(#MAIN_PANEL,-1,"BoxArt / Info")
     
-    Boxart_Image = CanvasGadget(#PB_Any, 4, 4, GetGadgetAttribute(Main_Panel,#PB_Panel_ItemWidth)-8, 532,#PB_Canvas_Border)
+    CanvasGadget(#BOXART_GADGET, 4, 4, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 532,#PB_Canvas_Border)
     
     CloseGadgetList()
     
-    Filter_Title=FrameGadget(#PB_Any,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,249,50,"Filter (Press F10 For Search)")
-    Main_Filter=ComboBoxGadget(#PB_Any,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,241,24)
+    FrameGadget(#FILTER_FRAME,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,249,50,"Filter (Press F10 For Search)")
     
-    Floppy_Text=FrameGadget(#PB_Any,254,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,248,50,"Floppy Speed (100%)")
-    Floppy_Slider=TrackBarGadget(#PB_Any,258,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,242,20,1,5,#PB_TrackBar_Ticks)
+    FrameGadget(#FLOPPY_FRAME,254,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,248,50,"Floppy Speed (100%)")
+    TrackBarGadget(#MAIN_FLOPPY,258,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,242,20,1,5,#PB_TrackBar_Ticks)
+    
+    ComboBoxGadget(#MAIN_FILTER,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,241,24)
+    SetGadgetColor(#MAIN_FILTER,#PB_Gadget_BackColor,#White)
     
   Else
     
-    Main_List = ListIconGadget(#PB_Any, 4,4,450,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
+    ListIconGadget(#MAIN_LIST, 4,4,450,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
     
     y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-572)/2
     
     ContainerGadget(#MEDIA_CONTAINER,458,y,810,564)
     
     If DesktopHeight(0)<=720
-      Title_Image = CanvasGadget(#PB_Any, 0, 4, 350, 278,#PB_Canvas_Border)
-      ScreenShot_Image = CanvasGadget(#PB_Any, 0, 290, 350, 278,#PB_Canvas_Border)
+      CanvasGadget(#TITLE_GADGET, 0, 4, 350, 278,#PB_Canvas_Border)
+      CanvasGadget(#SCREENSHOT_GADGET, 0, 290, 350, 278,#PB_Canvas_Border)
     Else
-      Title_Image = CanvasGadget(#PB_Any, 0, 4, 350, 278,#PB_Canvas_Border)
-      ScreenShot_Image = CanvasGadget(#PB_Any, 0, 289, 350, 278,#PB_Canvas_Border)
+      CanvasGadget(#TITLE_GADGET, 0, 4, 350, 278,#PB_Canvas_Border)
+      CanvasGadget(#SCREENSHOT_GADGET, 0, 289, 350, 278,#PB_Canvas_Border)
     EndIf
     
-    Boxart_Image = CanvasGadget(#PB_Any, 354, 4, 350, 564,#PB_Canvas_Border)
+    CanvasGadget(#BOXART_GADGET, 354, 4, 350, 564,#PB_Canvas_Border)
     
     CloseGadgetList()
     
-    Filter_Title=FrameGadget(#PB_Any,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Filter (Press F10 For Search)")
-    Main_Filter=ComboBoxGadget(#PB_Any,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,212,24)
+    FrameGadget(#FILTER_FRAME,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Filter (Press F10 For Search)")
     
-    Floppy_Text=FrameGadget(#PB_Any,227,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Floppy Speed (100%)")
-    Floppy_Slider=TrackBarGadget(#PB_Any,229,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,212,20,1,5,#PB_TrackBar_Ticks)
+    FrameGadget(#FLOPPY_FRAME,227,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Floppy Speed (100%)")
+    TrackBarGadget(#MAIN_FLOPPY,229,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,212,20,1,5,#PB_TrackBar_Ticks)
+    
+    ComboBoxGadget(#MAIN_FILTER,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,212,24)
+    SetGadgetColor(#MAIN_FILTER,#PB_Gadget_BackColor,#White)
     
   EndIf
   
-  SetGadgetState(Floppy_Slider,Floppy_Speed)
+  SetGadgetState(#MAIN_FLOPPY,Floppy_Speed)
   
-  SetGadgetItemAttribute(Main_List,0,#PB_ListIcon_ColumnWidth,GadgetWidth(Main_List)-4)
+  SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-4)
   
-  Pause_Gadget(Main_Filter)
+  AddGadgetItem(#MAIN_FILTER,-1,"None")
+  AddGadgetItem(#MAIN_FILTER,-1,"2MB RAM")
+  AddGadgetItem(#MAIN_FILTER,-1,"4MB RAM")
+  AddGadgetItem(#MAIN_FILTER,-1,"AGA")
+  AddGadgetItem(#MAIN_FILTER,-1,"Alpha")
+  AddGadgetItem(#MAIN_FILTER,-1,"American Laser Games")
+  AddGadgetItem(#MAIN_FILTER,-1,"AmigaCD")
+  AddGadgetItem(#MAIN_FILTER,-1,"AmiSpear")
+  AddGadgetItem(#MAIN_FILTER,-1,"AmiWolf")
+  AddGadgetItem(#MAIN_FILTER,-1,"Arcade")
+  AddGadgetItem(#MAIN_FILTER,-1,"Arcadia")
+  AddGadgetItem(#MAIN_FILTER,-1,"Beta")
+  AddGadgetItem(#MAIN_FILTER,-1,"Build Game")
+  AddGadgetItem(#MAIN_FILTER,-1,"CD32")
+  AddGadgetItem(#MAIN_FILTER,-1,"CDTV")
+  AddGadgetItem(#MAIN_FILTER,-1,"Chocolate Doom")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (3DS)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Apple IIGS)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Arcade)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Atari ST)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (C64)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (LaserDisc)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Macintosh)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (MS-DOS)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (MSX)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (MSX2)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (NES)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (PDA)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Sega CD)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Sharp X68000)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Windows)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Cubo CD32")
+  AddGadgetItem(#MAIN_FILTER,-1,"D1X Rebirth")
+  AddGadgetItem(#MAIN_FILTER,-1,"Demo")
+  AddGadgetItem(#MAIN_FILTER,-1,"Exult")
+  AddGadgetItem(#MAIN_FILTER,-1,"Full Game")
+  AddGadgetItem(#MAIN_FILTER,-1,"Hack")
+  AddGadgetItem(#MAIN_FILTER,-1,"Hard Disk")
+  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 1")
+  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 3")
+  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 4")
+  AddGadgetItem(#MAIN_FILTER,-1,"JFSW")
+  AddGadgetItem(#MAIN_FILTER,-1,"JFDuke3D")
+  AddGadgetItem(#MAIN_FILTER,-1,"Modification")
+  AddGadgetItem(#MAIN_FILTER,-1,"OCS/ECS")
+  AddGadgetItem(#MAIN_FILTER,-1,"Open Tyrian")
+  AddGadgetItem(#MAIN_FILTER,-1,"PET Version")
+  AddGadgetItem(#MAIN_FILTER,-1,"Pre Release")
+  AddGadgetItem(#MAIN_FILTER,-1,"Preview")
+  AddGadgetItem(#MAIN_FILTER,-1,"Prototype")
+  AddGadgetItem(#MAIN_FILTER,-1,"RTG")
+  AddGadgetItem(#MAIN_FILTER,-1,"Reflection Keen")
+  AddGadgetItem(#MAIN_FILTER,-1,"ScummVM")
+  AddGadgetItem(#MAIN_FILTER,-1,"ShapeShifter")
+  AddGadgetItem(#MAIN_FILTER,-1,"Unreleased")
+  AddGadgetItem(#MAIN_FILTER,-1,"ZDoom")
   
-  AddGadgetItem(Main_Filter,-1,"None")
-  AddGadgetItem(Main_Filter,-1,"2MB RAM")
-  AddGadgetItem(Main_Filter,-1,"4MB RAM")
-  AddGadgetItem(Main_Filter,-1,"AGA")
-  AddGadgetItem(Main_Filter,-1,"Alpha")
-  AddGadgetItem(Main_Filter,-1,"American Laser Games")
-  AddGadgetItem(Main_Filter,-1,"AmiDuke")
-  AddGadgetItem(Main_Filter,-1,"AmigaCD")
-  AddGadgetItem(Main_Filter,-1,"AmiSpear")
-  AddGadgetItem(Main_Filter,-1,"AmiWolf")
-  AddGadgetItem(Main_Filter,-1,"Arcade")
-  AddGadgetItem(Main_Filter,-1,"Arcadia")
-  AddGadgetItem(Main_Filter,-1,"Beta")
-  AddGadgetItem(Main_Filter,-1,"Build Game")
-  AddGadgetItem(Main_Filter,-1,"CD32")
-  AddGadgetItem(Main_Filter,-1,"CDTV")
-  AddGadgetItem(Main_Filter,-1,"Chocolate Doom")
-  AddGadgetItem(Main_Filter,-1,"Conversion (3DS)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Apple IIGS)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Arcade)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Atari ST)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (C64)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (LaserDisc)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Macintosh)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (MS-DOS)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (MSX)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (MSX2)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (NES)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (PDA)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Sega CD)")
-  AddGadgetItem(Main_Filter,-1,"Conversion (Windows)")
-  AddGadgetItem(Main_Filter,-1,"Cubo CD32")
-  AddGadgetItem(Main_Filter,-1,"D1X Rebirth")
-  AddGadgetItem(Main_Filter,-1,"Demo")
-  AddGadgetItem(Main_Filter,-1,"Exult")
-  AddGadgetItem(Main_Filter,-1,"Full Game")
-  AddGadgetItem(Main_Filter,-1,"Hack")
-  AddGadgetItem(Main_Filter,-1,"Hard Disk")
-  AddGadgetItem(Main_Filter,-1,"Intro Disk 1")
-  AddGadgetItem(Main_Filter,-1,"Intro Disk 3")
-  AddGadgetItem(Main_Filter,-1,"Intro Disk 4")
-  AddGadgetItem(Main_Filter,-1,"JFSW")
-  AddGadgetItem(Main_Filter,-1,"Modification")
-  AddGadgetItem(Main_Filter,-1,"OCS/ECS")
-  AddGadgetItem(Main_Filter,-1,"Open Tyrian")
-  AddGadgetItem(Main_Filter,-1,"Pre Release")
-  AddGadgetItem(Main_Filter,-1,"Preview")
-  AddGadgetItem(Main_Filter,-1,"Prototype")
-  AddGadgetItem(Main_Filter,-1,"RTG")
-  AddGadgetItem(Main_Filter,-1,"Reflection Keen")
-  AddGadgetItem(Main_Filter,-1,"ScummVM")
-  AddGadgetItem(Main_Filter,-1,"ShapeShifter")
-  AddGadgetItem(Main_Filter,-1,"Unreleased")
-  AddGadgetItem(Main_Filter,-1,"ZDoom")
-  
-  SetGadgetState(Main_Filter,0)
-  
-  Resume_Gadget(Main_Filter)
+  SetGadgetState(#MAIN_FILTER,0)
   
   CreateImage(#IFF_BLANK,DpiX(350), DpiY(564),32,#Black)
   StartDrawing(ImageOutput(#IFF_BLANK))
   FrontColor(#Red)
   DrawText(0,0,"No Image")
   StopDrawing()
-  StartDrawing(CanvasOutput(Title_Image))
+  StartDrawing(CanvasOutput(#TITLE_GADGET))
   DrawImage(ImageID(#IFF_BLANK),0,0)
   StopDrawing()
   
@@ -1579,9 +1612,9 @@ EndProcedure
 
 Procedure Draw_List()
   
-  Pause_Window(#MAIN_WINDOW)
+  Pause_Gadget(#MAIN_LIST)
   
-  ClearGadgetItems(Main_List)
+  ClearGadgetItems(#MAIN_LIST)
   
   ClearList(List_Numbers())
   
@@ -1590,22 +1623,19 @@ Procedure Draw_List()
   ForEach DD_List()
     If DD_List()\DD_Filtered=#True
       If Original_Names
-        AddGadgetItem(Main_List,-1,DD_List()\DD_Config)
+        AddGadgetItem(#MAIN_LIST,-1,DD_List()\DD_Config)
       Else
-        AddGadgetItem(Main_List,-1,DD_List()\DD_Name+Title_Extras())
+        AddGadgetItem(#MAIN_LIST,-1,DD_List()\DD_Name+Title_Extras())
       EndIf
+      If Mod(ListIndex(DD_List()),2)=0 : SetGadgetItemColor(#MAIN_LIST,ListIndex(DD_List()),#PB_Gadget_BackColor,$EEEEEE,#PB_All) : EndIf
       AddElement(List_Numbers())
       List_Numbers()=ListIndex(DD_List())
     EndIf
   Next    
   
-  For i=0 To CountGadgetItems(Main_List) Step 2
-    SetGadgetItemColor(Main_List,i,#PB_Gadget_BackColor,$EEEEEE,#PB_All)
-  Next
+  Resume_Gadget(#MAIN_LIST)
   
-  Resume_Window(#MAIN_WINDOW)
-  
-  SetGadgetState(Main_List,0)
+  SetGadgetState(#MAIN_LIST,0)
   
 EndProcedure
 
@@ -1763,6 +1793,7 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[Windows conversion]") : DD_List()\DD_Windows=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Windows conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Macintosh conversion]") : DD_List()\DD_Mac=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Macintosh conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Atari ST conversion]") : DD_List()\DD_Atari=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Atari ST conversion]") : EndIf
+    If FindString(DD_List()\DD_Name,"[PET version]") : DD_List()\DD_Pet=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[PET version]") : EndIf
     If FindString(DD_List()\DD_Name,"[C64 conversion]") : DD_List()\DD_C64=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[C64 conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[3DS conversion]") : DD_List()\DD_3DS=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[3DS conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[PDA conversion]") : DD_List()\DD_PDA=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[PDA conversion]") : EndIf
@@ -1771,7 +1802,7 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[Chocolate Doom]") : DD_List()\DD_CDoom=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Chocolate Doom]") : EndIf
     If FindString(DD_List()\DD_Name,"[JFSW]") : DD_List()\DD_JFSW=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[JFSW]") : EndIf
     If FindString(DD_List()\DD_Name,"[Build Game]") : DD_List()\DD_Build=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Build Game]") : EndIf
-    If FindString(DD_List()\DD_Name,"[AmiDuke]") : DD_List()\DD_AmiDuke=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[AmiDuke]") : EndIf
+    If FindString(DD_List()\DD_Name,"[JFDuke3D]") : DD_List()\DD_JFDuke=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[JFDuke]") : EndIf
     If FindString(DD_List()\DD_Name,"[Arcade]") : DD_List()\DD_Arcade=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Arcade]") : EndIf
     If FindString(DD_List()\DD_Name,"[Reflection Keen]") : DD_List()\DD_Keen=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Reflection Keen]") : EndIf
     If FindString(DD_List()\DD_Name,"[AmiSpear]") : DD_List()\DD_AmiSpear=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[AmiSpear]") : EndIf
@@ -1788,6 +1819,7 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[D1X_Rebirth]") : DD_List()\DD_D1X=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[D1X_Rebirth]") : EndIf
     If FindString(DD_List()\DD_Name,"[MSX conversion]") : DD_List()\DD_MSX=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[MSX conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[MSX2 conversion]") : DD_List()\DD_MSX2=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[MSX2 conversion]") : EndIf
+    If FindString(DD_List()\DD_Name,"[Sharp X68000 conversion]") : DD_List()\DD_X68k=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Sharp X68000 conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Apple IIGS conversion]") : DD_List()\DD_AppleII=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Apple IIGS conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Exult]") : DD_List()\DD_Exult=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Exult]") : EndIf
     If FindString(DD_List()\DD_Name,"[XBox 360 controllers]") : DD_List()\DD_X360=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[XBox 360 controllers]") : EndIf
@@ -1837,8 +1869,6 @@ If FileSize(".\Configurations\")=-2
   ResizeImage(#PDF_IMAGE,16,16)
   ResizeImage(#TEXT_IMAGE,16,16)
   
-  LoadFont(#INFO_FONT,"Lucida Sans Typewriter",8)
-  
   Load_Prefs()
   
   Draw_Main_Window()
@@ -1857,10 +1887,12 @@ If FileSize(".\Configurations\")=-2
   Draw_Info()
   
   HideWindow(#MAIN_WINDOW,#False)
+  
   SetActiveWindow(#MAIN_WINDOW)
-  SmartWindowRefresh(#MAIN_WINDOW,#True)
-  SetActiveGadget(Main_List)
-  SetGadgetState(Main_List,0)
+  SetActiveGadget(#MAIN_LIST)
+  SetGadgetState(#MAIN_LIST,0)
+  
+  Resume_Window(#MAIN_WINDOW)
   
 Else
   
@@ -1879,9 +1911,9 @@ Repeat
   Select event
       
     Case #WM_KEYDOWN
-      If CountGadgetItems(Main_List)>0
+      If CountGadgetItems(#MAIN_LIST)>0
         If EventwParam() = #VK_RETURN
-          If CountGadgetItems(Main_List)>0
+          If CountGadgetItems(#MAIN_LIST)>0
             Run_Game()
           EndIf 
         EndIf
@@ -1902,7 +1934,7 @@ Repeat
           If IsProgram(Program)
             MessageRequester("Error","WinUAE is already running!"+#CRLF$+"Please close it and try again.",#PB_MessageRequester_Error|#PB_MessageRequester_Ok)
           Else
-            If CountGadgetItems(Main_List)>0
+            If CountGadgetItems(#MAIN_LIST)>0
               Run_Game()
             EndIf
           EndIf;}
@@ -1934,20 +1966,20 @@ Repeat
             If ListSize(DD_List())>0
               ClearList(DD_List())
               ClearList(List_Numbers())
-              ClearGadgetItems(Main_List)
+              ClearGadgetItems(#MAIN_LIST)
               search_name=""
-              SetGadgetState(Main_Filter,0)
+              SetGadgetState(#MAIN_FILTER,0)
               Floppy_Speed=2
-              SetGadgetText(Floppy_Text,"Floppy Speed (100%)")
-              SetGadgetState(Floppy_Slider,2)
-              StartDrawing(CanvasOutput(Title_Image))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(Title_Image))-4, DpiY(GadgetHeight(Title_Image))-4)
+              SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (100%)")
+              SetGadgetState(#MAIN_FLOPPY,2)
+              StartDrawing(CanvasOutput(#TITLE_GADGET))
+              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
               StopDrawing()
-              StartDrawing(CanvasOutput(ScreenShot_Image))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(ScreenShot_Image))-4, DpiY(GadgetHeight(ScreenShot_Image))-4)
+              StartDrawing(CanvasOutput(#SCREENSHOT_GADGET))
+              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#SCREENSHOT_GADGET))-4, DpiY(GadgetHeight(#SCREENSHOT_GADGET))-4)
               StopDrawing()
-              StartDrawing(CanvasOutput(Boxart_Image))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(Boxart_Image))-4, DpiY(GadgetHeight(Boxart_Image))-4)
+              StartDrawing(CanvasOutput(#BOXART_GADGET))
+              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#BOXART_GADGET))-4, DpiY(GadgetHeight(#BOXART_GADGET))-4)
               StopDrawing()
               Window_Update()
               Process_UAE()
@@ -1957,20 +1989,20 @@ Repeat
               SelectElement(DD_List(),0)
               Draw_List()
               Draw_Info()
-              SetGadgetState(Main_List,0)
-              SetActiveGadget(Main_List)
+              SetGadgetState(#MAIN_LIST,0)
+              SetActiveGadget(#MAIN_LIST)
             EndIf
           EndIf ;}
         Case #MenuItem_5  ;{- Search
-          count=GetGadgetState(Main_List)
+          count=GetGadgetState(#MAIN_LIST)
           search_name=InputRequester("Search Database","Enter Search Name:",search_name)
           If search_name>""
-            SetGadgetText(Filter_Title,"Filter (F10) (Search: "+#DOUBLEQUOTE$+search_name+#DOUBLEQUOTE$+")")
+            SetGadgetText(#FILTER_FRAME,"Filter (F10) (Search: "+#DOUBLEQUOTE$+search_name+#DOUBLEQUOTE$+")")
           Else
-            SetGadgetText(Filter_Title,"Filter (F10)")
+            SetGadgetText(#FILTER_FRAME,"Filter (F10)")
           EndIf
           Draw_List()
-          SetGadgetState(Main_List,0)
+          SetGadgetState(#MAIN_LIST,0)
           Draw_Info()
           ;} 
         Case #MenuItem_6  ;{- Show GUI
@@ -2061,7 +2093,7 @@ Repeat
       
       Select EventGadget()
           
-        Case Main_List
+        Case #MAIN_LIST
           If EventType()= #PB_EventType_Change
             Get_Game_Number()
             Draw_Info()
@@ -2073,7 +2105,7 @@ Repeat
             DisplayPopupMenu(#POPUP_MENU, WindowID(#MAIN_WINDOW))
           EndIf
           
-        Case Title_Image
+        Case #TITLE_GADGET
           If ListSize(DD_List())>0
             If EventType()= #PB_EventType_LeftDoubleClick
               Image_Popup(1)
@@ -2083,7 +2115,7 @@ Repeat
             EndIf
           EndIf
           
-        Case ScreenShot_Image
+        Case #SCREENSHOT_GADGET
           If ListSize(DD_List())>0
             If EventType()= #PB_EventType_LeftDoubleClick
               Image_Popup(2)
@@ -2093,7 +2125,7 @@ Repeat
             EndIf
           EndIf
           
-        Case Boxart_Image
+        Case #BOXART_GADGET
           If ListSize(DD_List())>0
             If EventType()= #PB_EventType_LeftDoubleClick
               Image_Popup(3)
@@ -2103,20 +2135,21 @@ Repeat
             EndIf
           EndIf          
           
-        Case Main_Filter       
+        Case #MAIN_FILTER       
           Draw_List()
-          SetGadgetState(Main_List,0)
+          SetGadgetState(#MAIN_LIST,0)
           Draw_Info()
-          SetActiveGadget(Main_List)
+          SetActiveGadget(#MAIN_LIST)
           
-        Case Floppy_Slider
-          Floppy_Speed=GetGadgetState(Floppy_Slider)
+        Case #MAIN_FLOPPY
+          
+          Floppy_Speed=GetGadgetState(#MAIN_FLOPPY)
           Select Floppy_Speed
-            Case 1 : SetGadgetText(Floppy_Text,"Floppy Speed (Turbo)")
-            Case 2 : SetGadgetText(Floppy_Text,"Floppy Speed (100%)")
-            Case 3 : SetGadgetText(Floppy_Text,"Floppy Speed (200%)")
-            Case 4 : SetGadgetText(Floppy_Text,"Floppy Speed (400%)")
-            Case 5 : SetGadgetText(Floppy_Text,"Floppy Speed (800%)")
+            Case 1 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (Turbo)")
+            Case 2 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (100%)")
+            Case 3 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (200%)")
+            Case 4 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (400%)")
+            Case 5 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (800%)")
           EndSelect
           
       EndSelect
@@ -2204,18 +2237,18 @@ DataSection
   
 EndDataSection
 
-; IDE Options = PureBasic 6.00 Beta 2 (Windows - x64)
-; CursorPosition = 1394
-; FirstLine = 395
-; Folding = AAAAgAAAw
+; IDE Options = PureBasic 6.00 Beta 3 (Windows - x64)
+; CursorPosition = 133
+; FirstLine = 111
+; Folding = AAwAgFAAw
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = DDlaunch64.exe
+; Executable = I:\WinUAE\DDlaunch64.exe
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 2 - C Backend (Windows - x64)
+; Compiler = PureBasic 6.00 Beta 3 - C Backend (Windows - x64)
 ; Debugger = Standalone
 ; IncludeVersionInfo
 ; VersionField0 = 1.0.0.0
