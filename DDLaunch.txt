@@ -222,3 +222,13 @@ Version History
  12. Moved configuration folder check to prevent any files being created if there
      was an error.
 
+ v1.3
+ -----
+ 1. Main window is no longer disabled when running a game.
+ 2. Replaced protected gadget variables.
+ 3. Removed SmartWindowRefresh as it corrupts gadgets on Windows 11.
+ 4. Tweaked gadget drawing.
+ 5. Removed unnecessary font load.
+ 6. Removed AmiDuke from filter
+ 7. Added JFDuke3d, Sharp X6800 conversion and PET version to the filter.
+
