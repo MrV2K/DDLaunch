@@ -1,6 +1,6 @@
 ;- **** DDLaunch ****
 ;
-; Version 1.2
+; Version 1.3
 ;
 ; © 2021 Paul Vince (MrV2k)
 ;
@@ -2238,8 +2238,7 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 3 (Windows - x64)
-; CursorPosition = 133
-; FirstLine = 111
+; CursorPosition = 2
 ; Folding = AAwAgFAAw
 ; Optimizer
 ; EnableThread
