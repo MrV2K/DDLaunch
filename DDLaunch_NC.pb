@@ -140,6 +140,7 @@
 ; 5. Removed unnecessary font load.
 ; 6. Removed AmiDuke from filter
 ; 7. Added JFDuke3d, Sharp X6800 conversion and PET version to the filter.
+; 8. Fixed a bug that prevents the GUI redrawing when resized.
 
 EnableExplicit
 
@@ -1403,6 +1404,8 @@ EndProcedure
 
 Procedure Draw_Main_Window()
   
+
+  
   Protected winheight.i, winwidth.i, y.i
   
   ExamineDesktops()
@@ -2024,6 +2027,7 @@ Repeat
           Draw_Main_Window()
           Draw_List()
           Draw_Info()
+          HideWindow(#MAIN_WINDOW,#False)
           ;}  
         Case #MenuItem_14 ;{- Full Screen
           Window_Type=1
@@ -2061,6 +2065,7 @@ Repeat
           Draw_Main_Window()
           Draw_List()
           Draw_Info()
+          HideWindow(#MAIN_WINDOW,#False)
           ;}
         Case #MenuItem_10 ;{- Save Settings
           Save_Prefs()
@@ -2238,16 +2243,17 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 3 (Windows - x64)
-; CursorPosition = 2
+; CursorPosition = 142
+; FirstLine = 117
 ; Folding = AAwAgFAAw
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDlaunch64.exe
+; Executable = I:\WinUAE\DDLaunch.exe
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 3 - C Backend (Windows - x64)
+; Compiler = PureBasic 6.00 Beta 3 - C Backend (Windows - x86)
 ; Debugger = Standalone
 ; IncludeVersionInfo
 ; VersionField0 = 1.0.0.0
