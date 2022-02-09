@@ -147,6 +147,9 @@
 ; 1. Added menu switch to turn scanlines on or off. Saved in prefs.
 ; 2. Added menu switch to turn the in-game LEDs on or off. Saved in prefs.
 ; 3. Fixed box art border colour loading from the prefs file.
+; 4. Removed compact mode
+; 5. Window now automatically resizes to you desktop size. If your monitor aspect is over 16:9 the windwo ratio is limited to 16:9.
+; 6. All gadgets automatically resize to the window.
 
 EnableExplicit
 
@@ -283,8 +286,6 @@ Global Window_Type=1
 Global search_name.s=""
 Global Floppy_Speed.i=2
 Global Show_GUI.b=#False
-Global Stretch_Window.b=#False
-Global Compact_Layout.b=#False
 Global Close_Confirm.b=#False
 Global Box_Colour=$0000FF
 Global Original_Names.b=#True
@@ -379,11 +380,6 @@ Macro DpiY(value) ; <--------------------------------------------------> DPI Y S
   DesktopScaledY(value)
 EndMacro
 
-Macro Pause_Console()
-  PrintN("Press A Key To Continue...")
-  Repeat : Until Inkey()<>""
-EndMacro
-
 Macro Pause_Window(window)
   SendMessage_(WindowID(window),#WM_SETREDRAW,0,0)
 EndMacro
@@ -392,16 +388,6 @@ Macro Resume_Window(window)
   SendMessage_(WindowID(window),#WM_SETREDRAW,1,0)
   InvalidateRect_(WindowID(window),0,1)
   UpdateWindow_(WindowID(window))
-EndMacro
-
-Macro PrintNCol(PText,PFCol,PBCol)
-  ConsoleColor(PFCol,PBCol)
-  PrintN(PText)
-  ConsoleColor(7,0)
-EndMacro
-
-Macro PrintS()
-  PrintN("")
 EndMacro
 
 Macro Get_Game_Number()
@@ -906,9 +892,9 @@ Procedure Draw_Info()
   EndIf
   
   If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4,#PB_Image_Smooth)
+    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET)), DpiY(GadgetHeight(#TITLE_GADGET)),#PB_Image_Smooth)
     StartDrawing(CanvasOutput(#TITLE_GADGET))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
+    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET)), DpiY(GadgetHeight(#TITLE_GADGET)))
     StopDrawing()
   EndIf
   
@@ -927,9 +913,9 @@ Procedure Draw_Info()
   EndIf
   
   If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#SCREENSHOT_GADGET))-4, DpiY(GadgetHeight(#SCREENSHOT_GADGET))-4,#PB_Image_Smooth)
+    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#SCREENSHOT_GADGET)), DpiY(GadgetHeight(#SCREENSHOT_GADGET)),#PB_Image_Raw)
     StartDrawing(CanvasOutput(#SCREENSHOT_GADGET))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#SCREENSHOT_GADGET))-4, DpiY(GadgetHeight(#SCREENSHOT_GADGET))-4)
+    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#SCREENSHOT_GADGET)), DpiY(GadgetHeight(#SCREENSHOT_GADGET)))
     StopDrawing()
   EndIf
   
@@ -949,31 +935,16 @@ Procedure Draw_Info()
   
   Protected scale.f, offset.i, box_x.i, box_w.i, img_width.i, img_height.i, x_size.i
   
-  If Compact_Layout
-    box_x=4
-    box_w=GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8
-    scale=box_w/ImageWidth(#IFF_IMAGE)
-    x_size=GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemHeight)-94
-    If Int(ImageHeight(#IFF_IMAGE)*scale)>x_size
-      offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-      If offset<0 : offset=0 : EndIf
-      img_height=x_size
-    Else 
-      offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-      img_height=Int(ImageHeight(#IFF_IMAGE)*scale)
-    EndIf
-  Else
-    box_x=812
-    box_w=350
-    scale=box_w/ImageWidth(#IFF_IMAGE)
-    x_size=GadgetHeight(#BOXART_GADGET)
-    If Int(ImageHeight(#IFF_IMAGE)*scale)>550
-      offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-      img_height=x_size
-    Else 
-      offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-      img_height=Int(ImageHeight(#IFF_IMAGE)*scale)
-    EndIf
+  box_x=GadgetHeight(#BOXART_GADGET)
+  box_w=GadgetWidth(#BOXART_GADGET)
+  scale=box_w/ImageWidth(#IFF_IMAGE)
+  x_size=GadgetHeight(#BOXART_GADGET)
+  If Int(ImageHeight(#IFF_IMAGE)*scale)>550
+    offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
+    img_height=x_size
+  Else 
+    offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
+    img_height=Int(ImageHeight(#IFF_IMAGE)*scale)
   EndIf
   
   If IsImage(#IFF_IMAGE)
@@ -1253,8 +1224,6 @@ Procedure Save_Prefs()
   If FileSize(Home_Path+"DD_LAUNCH.prefs")>0 : DeleteFile(Home_Path+"DD_LAUNCH.prefs") : EndIf
   If CreateFile(0,Home_Path+"DD_LAUNCH.prefs")
     WriteStringN(0,"Show_GUI="+Show_GUI)
-    WriteStringN(0,"Stretch_Window="+Stretch_Window)
-    WriteStringN(0,"Compact_Layout="+Compact_Layout)
     WriteStringN(0,"Window_Type="+Window_Type)
     WriteStringN(0,"Floppy_Speed="+Floppy_Speed)
     WriteStringN(0,"Close_Confirm="+Close_Confirm)
@@ -1274,8 +1243,6 @@ Procedure Load_Prefs()
     While Not Eof(0)
       input$=ReadString(0)
       If FindString(input$,"Show_GUI=") : Show_GUI=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Stretch_Window=") : Stretch_Window=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Compact_Layout=") : Compact_Layout=Val(StringField(input$,2,"=")) : EndIf
       If FindString(input$,"Window_Type=") : Window_Type=Val(StringField(input$,2,"=")) : EndIf
       If FindString(input$,"Floppy_Speed=") : Floppy_Speed=Val(StringField(input$,2,"=")) : EndIf
       If FindString(input$,"Close_Confirm=") : Close_Confirm=Val(StringField(input$,2,"=")) : EndIf
@@ -1365,143 +1332,45 @@ Procedure Draw_Main_Window()
   
   ExamineDesktops()
   
-  If Compact_Layout
-    winwidth=872
-  Else
-    winwidth=1166
-  EndIf    
-  
   winheight=DesktopUnscaledY(GetMaxWindowHeight())
   
-  If Stretch_Window
-    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 5, winwidth , winheight-10 , W_Title , #PB_Window_SystemMenu | #PB_Window_Invisible | #PB_Window_MinimizeGadget)
-  Else 
-    OpenWindow(#MAIN_WINDOW, (DesktopWidth(0)-winwidth)/2, 0, winwidth , 591 , W_Title , #PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible | #PB_Window_ScreenCentered)
-  EndIf
+  winwidth=(winheight/9)*16
+  
+  If winwidth<1368 And DesktopWidth(0)>1280 : winwidth=1352 : EndIf
+
+  OpenWindow(#MAIN_WINDOW, ((DesktopWidth(0)-winwidth)/2)-2, 5, winwidth , winheight-8, W_Title , #PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible)
   
   Pause_Window(#MAIN_WINDOW)
+
+  ListIconGadget(#MAIN_LIST,2,2,400,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
   
-  CreatePopupMenu(#DUMMY_MENU)
+  y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-572)/2
+
+  Protected gw.i
+  Protected gh.i
+    
+  gh=WindowHeight(#MAIN_WINDOW)-MenuHeight()
+  gw=(gh/4)*5
   
-  CreateImageMenu(#MAIN_MENU, WindowID(#MAIN_WINDOW))
-  MenuTitle("File")
-  MenuItem(#MenuItem_1, "Run Game"+Chr(9)+"Enter",ImageID(#PLAY_IMAGE))
-  MenuItem(#MenuItem_13,"Open Game Folder"+Chr(9)+"F4",ImageID(#FOLDER_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F4,#MenuItem_13)
-  MenuBar()
-  MenuItem(#MenuItem_5, "Search Database"+Chr(9)+"F10",ImageID(#SEARCH_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F10,#MenuItem_5)
-  MenuItem(#MenuItem_4, "Refresh Database"+Chr(9)+"F5",ImageID(#REFRESH_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F5,#MenuItem_4)
-  MenuBar()
-  MenuItem(#MenuItem_3, "Quit"+Chr(9)+"Ctrl+Q",ImageID(#CLOSE_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_Control|#PB_Shortcut_Q,#MenuItem_3)  
-  MenuTitle("Options")
-  If Original_Names
-    MenuItem(#MenuItem_18, "Use New Names")
-  Else
-    MenuItem(#MenuItem_18, "Use Original Names")
-  EndIf
-  MenuBar()
-  MenuItem(#MenuItem_6, "Show WinUAE GUI")
-  OpenSubMenu("WinUAE Screen")
-  MenuItem(#MenuItem_14, "Full Screen")
-  MenuItem(#MenuItem_9, "Full Window")
-  MenuItem(#MenuItem_15, "Windowed")
-  CloseSubMenu()
-  MenuBar()
-  MenuItem(#MenuItem_19, "Show Scanlines")
-  MenuItem(#MenuItem_20, "Show LEDS")
-  MenuBar()
-  MenuItem(#MenuItem_7, "Stretch GUI")
-  If Compact_Layout
-    MenuItem(#MenuItem_8, "Wide GUI")
-  Else
-    MenuItem(#MenuItem_8, "Compact GUI")
-  EndIf
-  MenuItem(#MenuItem_12, "Box Art Outline Colour")
-  MenuBar()
-  MenuItem(#MenuItem_11, "Close Confirmation")
-  MenuBar()
-  MenuItem(#MenuItem_10, "Save Settings",ImageID(#FOLDER_IMAGE))
-  MenuTitle("Help")
-  MenuItem(#MenuItem_16, "Help"+Chr(9)+"F12",ImageID(#HELP_IMAGE))
-  MenuItem(#MenuItem_2, "About",ImageID(#INFO_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F12,#MenuItem_16)  
-  SetMenuItemState(#MAIN_MENU,#MenuItem_6,Show_GUI)
-  SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
+  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+16,0,gw-10,gh+2)
   
-  Select Window_Type
-    Case 1 : SetMenuItemState(#MAIN_MENU,#MenuItem_14,Window_Type)
-    Case 2 : SetMenuItemState(#MAIN_MENU,#MenuItem_9,Window_Type)
-    Case 3 : SetMenuItemState(#MAIN_MENU,#MenuItem_15,Window_Type)
-  EndSelect
+  CanvasGadget(#TITLE_GADGET     , 2, 2, (gw/2)-2, (gh/2)-0,#PB_Canvas_Border)
+  CanvasGadget(#SCREENSHOT_GADGET, 2, (gh/2)+4, (gw/2)-0, (gh/2)-8,#PB_Canvas_Border)
+  CanvasGadget(#BOXART_GADGET, (GadgetWidth(#MEDIA_CONTAINER)/2)+6, 2, (GadgetWidth(#MEDIA_CONTAINER)/2)-12, GadgetHeight(#MEDIA_CONTAINER)-8,#PB_Canvas_Border)
   
-  SetMenuItemState(#MAIN_MENU,#MenuItem_19,Use_Scanlines)
-  SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
-  SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
+  CloseGadgetList()
   
-  If Compact_Layout
-    
-    ListIconGadget(#MAIN_LIST, 4,4,500,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
-    
-    y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-564)/2
-    
-    PanelGadget(#MAIN_PANEL,508, y ,360, 564)
-    
-    AddGadgetItem(#MAIN_PANEL,-1,"Screen Shots")
-    
-    CanvasGadget(#TITLE_GADGET, 4, 6, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
-    
-    CanvasGadget(#SCREENSHOT_GADGET, 4, 272, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 258,#PB_Canvas_Border)
-    
-    AddGadgetItem(#MAIN_PANEL,-1,"BoxArt / Info")
-    
-    CanvasGadget(#BOXART_GADGET, 4, 4, GetGadgetAttribute(#MAIN_PANEL,#PB_Panel_ItemWidth)-8, 532,#PB_Canvas_Border)
-    
-    CloseGadgetList()
-    
-    FrameGadget(#FILTER_FRAME,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,249,50,"Filter (Press F10 For Search)")
-    
-    FrameGadget(#FLOPPY_FRAME,254,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,248,50,"Floppy Speed (100%)")
-    TrackBarGadget(#MAIN_FLOPPY,258,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,242,20,1,5,#PB_TrackBar_Ticks)
-    
-    ComboBoxGadget(#MAIN_FILTER,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,241,24)
-    SetGadgetColor(#MAIN_FILTER,#PB_Gadget_BackColor,#White)
-    
-  Else
-    
-    ListIconGadget(#MAIN_LIST, 4,4,450,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "Column 1", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
-    
-    y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-572)/2
-    
-    ContainerGadget(#MEDIA_CONTAINER,458,y,810,564)
-    
-    If DesktopHeight(0)<=720
-      CanvasGadget(#TITLE_GADGET, 0, 4, 350, 278,#PB_Canvas_Border)
-      CanvasGadget(#SCREENSHOT_GADGET, 0, 290, 350, 278,#PB_Canvas_Border)
-    Else
-      CanvasGadget(#TITLE_GADGET, 0, 4, 350, 278,#PB_Canvas_Border)
-      CanvasGadget(#SCREENSHOT_GADGET, 0, 289, 350, 278,#PB_Canvas_Border)
-    EndIf
-    
-    CanvasGadget(#BOXART_GADGET, 354, 4, 350, 564,#PB_Canvas_Border)
-    
-    CloseGadgetList()
-    
-    FrameGadget(#FILTER_FRAME,4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Filter (Press F10 For Search)")
-    
-    FrameGadget(#FLOPPY_FRAME,227,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,220,50,"Floppy Speed (100%)")
-    TrackBarGadget(#MAIN_FLOPPY,229,WindowHeight(#MAIN_WINDOW)-MenuHeight()-32,212,20,1,5,#PB_TrackBar_Ticks)
-    
-    ComboBoxGadget(#MAIN_FILTER,8,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,212,24)
-    SetGadgetColor(#MAIN_FILTER,#PB_Gadget_BackColor,#White)
-    
-  EndIf
+  ResizeGadget(#MAIN_LIST,2,2,(WindowWidth(#MAIN_WINDOW)-GadgetWidth(#MEDIA_CONTAINER))+4,#PB_Ignore)
   
+  FrameGadget(#FILTER_FRAME,2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,(GadgetWidth(#MAIN_LIST)/2)-2,50,"Filter (Press F10 For Search)")
+  ComboBoxGadget(#MAIN_FILTER,6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,(GadgetWidth(#MAIN_LIST)/2)-10,24)
+  
+  FrameGadget(#FLOPPY_FRAME,(GadgetWidth(#MAIN_LIST)/2)+2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,GadgetWidth(#MAIN_LIST)/2,50,"Floppy Speed (100%)")
+  TrackBarGadget(#MAIN_FLOPPY,(GadgetWidth(#MAIN_LIST)/2)+6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-34,(GadgetWidth(#MAIN_LIST)/2)-10,20,1,5,#PB_TrackBar_Ticks)
+
   SetGadgetState(#MAIN_FLOPPY,Floppy_Speed)
   
-  SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-4)
+  SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST))
   
   AddGadgetItem(#MAIN_FILTER,-1,"None")
   AddGadgetItem(#MAIN_FILTER,-1,"2MB RAM")
@@ -1561,6 +1430,58 @@ Procedure Draw_Main_Window()
   AddGadgetItem(#MAIN_FILTER,-1,"ZDoom")
   
   SetGadgetState(#MAIN_FILTER,0)
+
+  CreatePopupMenu(#DUMMY_MENU)
+  
+  CreateImageMenu(#MAIN_MENU, WindowID(#MAIN_WINDOW))
+  MenuTitle("File")
+  MenuItem(#MenuItem_1, "Run Game"+Chr(9)+"Enter",ImageID(#PLAY_IMAGE))
+  MenuItem(#MenuItem_13,"Open Game Folder"+Chr(9)+"F4",ImageID(#FOLDER_IMAGE))
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F4,#MenuItem_13)
+  MenuBar()
+  MenuItem(#MenuItem_5, "Search Database"+Chr(9)+"F10",ImageID(#SEARCH_IMAGE))
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F10,#MenuItem_5)
+  MenuItem(#MenuItem_4, "Refresh Database"+Chr(9)+"F5",ImageID(#REFRESH_IMAGE))
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F5,#MenuItem_4)
+  MenuBar()
+  MenuItem(#MenuItem_3, "Quit"+Chr(9)+"Ctrl+Q",ImageID(#CLOSE_IMAGE))
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_Control|#PB_Shortcut_Q,#MenuItem_3)  
+  MenuTitle("Options")
+  If Original_Names
+    MenuItem(#MenuItem_18, "Use New Names")
+  Else
+    MenuItem(#MenuItem_18, "Use Original Names")
+  EndIf
+  MenuBar()
+  MenuItem(#MenuItem_6, "Show WinUAE GUI")
+  OpenSubMenu("WinUAE Screen")
+  MenuItem(#MenuItem_14, "Full Screen")
+  MenuItem(#MenuItem_9, "Full Window")
+  MenuItem(#MenuItem_15, "Windowed")
+  CloseSubMenu()
+  MenuBar()
+  MenuItem(#MenuItem_19, "Show Scanlines")
+  MenuItem(#MenuItem_20, "Show LEDs")
+  MenuBar()
+  MenuItem(#MenuItem_12, "Box Art Outline Colour")
+  MenuBar()
+  MenuItem(#MenuItem_11, "Close Confirmation")
+  MenuBar()
+  MenuItem(#MenuItem_10, "Save Settings",ImageID(#FOLDER_IMAGE))
+  MenuTitle("Help")
+  MenuItem(#MenuItem_16, "Help"+Chr(9)+"F12",ImageID(#HELP_IMAGE))
+  MenuItem(#MenuItem_2, "About",ImageID(#INFO_IMAGE))
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F12,#MenuItem_16)  
+  
+  Select Window_Type
+    Case 1 : SetMenuItemState(#MAIN_MENU,#MenuItem_14,Window_Type)
+    Case 2 : SetMenuItemState(#MAIN_MENU,#MenuItem_9,Window_Type)
+    Case 3 : SetMenuItemState(#MAIN_MENU,#MenuItem_15,Window_Type)
+  EndSelect
+  
+  SetMenuItemState(#MAIN_MENU,#MenuItem_19,Use_Scanlines)
+  SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
+  SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
   
   CreateImage(#IFF_BLANK,DpiX(350), DpiY(564),32,#Black)
   StartDrawing(ImageOutput(#IFF_BLANK))
@@ -1972,20 +1893,7 @@ Repeat
             Show_GUI=#True
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_6,Show_GUI)
-          ;}  
-        Case #MenuItem_7  ;{- Stretch Window
-          If Stretch_Window
-            Stretch_Window=#False
-          Else
-            Stretch_Window=#True
-          EndIf
-          SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
-          CloseWindow(#MAIN_WINDOW)
-          Draw_Main_Window()
-          Draw_List()
-          Draw_Info()
-          HideWindow(#MAIN_WINDOW,#False)
-          ;}  
+          ;}   
         Case #MenuItem_14 ;{- Full Screen
           Window_Type=1
           SetMenuItemState(#MAIN_MENU,#MenuItem_14,#True)
@@ -2012,18 +1920,6 @@ Repeat
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
           ;} 
-        Case #MenuItem_8  ;{- Compact Layout
-          If Compact_Layout
-            Compact_Layout=#False
-          Else
-            Compact_Layout=#True
-          EndIf
-          CloseWindow(#MAIN_WINDOW)
-          Draw_Main_Window()
-          Draw_List()
-          Draw_Info()
-          HideWindow(#MAIN_WINDOW,#False)
-          ;}
         Case #MenuItem_10 ;{- Save Settings
           Save_Prefs()
           ;}
@@ -2216,17 +2112,17 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 4 (Windows - x64)
-; CursorPosition = 1067
-; FirstLine = 425
-; Folding = AAAIWAAA5
+; CursorPosition = 150
+; FirstLine = 126
+; Folding = AAAAAAAg
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDLaunch64.exe
+; Executable = I:\WinUAE\DDLaunch_test.exe
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x64)
+; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x86)
 ; Debugger = Standalone
 ; IncludeVersionInfo
 ; VersionField0 = 1.0.0.0
