@@ -6,7 +6,7 @@
 ;
 ; https://easymame.mameworld.info
 ;
-; [ PB V5.7x / 32Bit & 64Bit / Windows / DPI ]
+; [ PB v5.7x/v6.x / 32Bit & 64Bit / Windows / DPI ]
 ;
 ; A launcher for DamienD's Commodore Amiga Software Collection
 ;
@@ -148,8 +148,15 @@
 ; 2. Added menu switch to turn the in-game LEDs on or off. Saved in prefs.
 ; 3. Fixed box art border colour loading from the prefs file.
 ; 4. Removed compact mode
-; 5. Window now automatically resizes to you desktop size. If your monitor aspect is over 16:9 the windwo ratio is limited to 16:9.
+; 5. Stretch window now automatically resizes to your desktop size. If your monitor aspect is over 16:9 the window ratio is limited to 16:9.
 ; 6. All gadgets automatically resize to the window.
+; 7. Fixed floppy speed frame showing the wrong percentage when starting the program.
+; 8. Added Wii and Megadrive conversion to the filter.
+; 9. Renamed and removed a couple of filters on DD's request.
+; 10. Slightly sped up config scrape procedure.
+; 11. Config list automatically resizes if there is a vertical scrollbar.
+; 12. Fixed bug in config list drawing that stopped alternate line backgrounds if the filter was used.
+; 13. Added default window width and height to prefs. Change these settings to change the default window size. Minimum is 1280 wide x 720 high. 
 
 EnableExplicit
 
@@ -271,8 +278,8 @@ EndEnumeration
 
 ;- **** Global Variables ****
 
-Global W_Title.s="DDLaunch v1.4"
-
+Global Version.s="v1.4"
+Global W_Title.s="DDLaunch "+Version
 Global event.i, count.i, i.i, path.s, Window_Type.b, Program.i
 Global Docs_Text.i, Docs_Text2.i
 
@@ -291,6 +298,9 @@ Global Box_Colour=$0000FF
 Global Original_Names.b=#True
 Global Use_Scanlines.b=#True
 Global Show_Leds=#True
+Global Stretch_Window=#True
+Global WinW=1366
+Global WinH=768
 
 ;- **** Structures ****
 
@@ -356,6 +366,9 @@ Structure DD_Data
   DD_X360.b
   DD_X68k.b
   DD_Pet.b
+  DD_Nova.b
+  DD_Megadrive.b
+  DD_Wii.b
 EndStructure
 
 Structure UData
@@ -502,6 +515,10 @@ Procedure.s Title_Extras()
     extras+" [RTG]"
   EndIf 
   
+  If DD_List()\DD_Nova
+    extras+" [Nova]"
+  EndIf
+  
   If DD_List()\DD_FullGame
     extras+" [Full Game]"
   EndIf
@@ -619,7 +636,7 @@ Procedure.s Title_Extras()
   EndIf
   
   If DD_List()\DD_D1X
-    extras+" [D1X Rebirth]"
+    extras+" [D1X_Rebirth]"
   EndIf
   
   If DD_List()\DD_CDoom
@@ -631,7 +648,7 @@ Procedure.s Title_Extras()
   EndIf
   
   If DD_List()\DD_Tyrian
-    extras+" [Open Tyrian]"
+    extras+" [OpenTyrian]"
   EndIf
   
   If DD_List()\DD_AmiSpear
@@ -654,7 +671,7 @@ Procedure.s Title_Extras()
     extras+" [ScummVM]"
   EndIf
   
-  If DD_List()\DD_American
+  If DD_List()\DD_American And Not DD_List()\DD_Nova
     extras+" [American Laser Games]"
   EndIf
   
@@ -743,16 +760,13 @@ Procedure Filter_List()
       Case "Arcade" : DD_List()\DD_Filtered=DD_List()\DD_Arcade
       Case "Cubo CD32" : DD_List()\DD_Filtered=DD_List()\DD_Cubo
       Case "Unreleased" : DD_List()\DD_Filtered=DD_List()\DD_Unreleased
-      Case "Pre Release" : DD_List()\DD_Filtered=DD_List()\DD_PreRelease
+      Case "Pre-Release" : DD_List()\DD_Filtered=DD_List()\DD_PreRelease
       Case "Preview" : DD_List()\DD_Filtered=DD_List()\DD_Preview
       Case "Beta" : DD_List()\DD_Filtered=DD_List()\DD_Beta
       Case "Demo" : DD_List()\DD_Filtered=DD_List()\DD_Demo
       Case "Hack" : DD_List()\DD_Filtered=DD_List()\DD_Hack
       Case "Alpha" : DD_List()\DD_Filtered=DD_List()\DD_Alpha
       Case "Modification" : DD_List()\DD_Filtered=DD_List()\DD_Mod
-      Case "Intro Disk 1" : DD_List()\DD_Filtered=DD_List()\DD_Intro1
-      Case "Intro Disk 3" : DD_List()\DD_Filtered=DD_List()\DD_Intro3
-      Case "Intro Disk 4" : DD_List()\DD_Filtered=DD_List()\DD_Intro4
       Case "Conversion (Arcade)" : DD_List()\DD_Filtered=DD_List()\DD_Arcade_Conv
       Case "Conversion (NES)" : DD_List()\DD_Filtered=DD_List()\DD_NES
       Case "Conversion (MS-DOS)" : DD_List()\DD_Filtered=DD_List()\DD_MSDOS
@@ -766,6 +780,8 @@ Procedure Filter_List()
       Case "Conversion (MSX2)" : DD_List()\DD_Filtered=DD_List()\DD_MSX2
       Case "Conversion (Apple IIGS)" : DD_List()\DD_Filtered=DD_List()\DD_AppleII
       Case "Conversion (Sega CD)" : DD_List()\DD_Filtered=DD_List()\DD_SegaCD
+      Case "Conversion (Sega MegaDrive)" : DD_List()\DD_Filtered=DD_List()\DD_Megadrive
+      Case "Conversion (Wii)" : DD_List()\DD_Filtered=DD_List()\DD_Wii
       Case "Conversion (Sharp X68000)" : DD_List()\DD_Filtered=DD_List()\DD_X68k
       Case "ZDoom" : DD_List()\DD_Filtered=DD_List()\DD_ZDoom
       Case "Chocolate Doom" : DD_List()\DD_Filtered=DD_List()\DD_CDoom
@@ -776,15 +792,13 @@ Procedure Filter_List()
       Case "JFSW" : DD_List()\DD_Filtered=DD_List()\DD_JFSW
       Case "JFDuke3D" : DD_List()\DD_Filtered=DD_List()\DD_JFDuke
       Case "Build Game" : DD_List()\DD_Filtered=DD_List()\DD_Build
-      Case "Open Tyrian" : DD_List()\DD_Filtered=DD_List()\DD_Tyrian
-      Case "D1X Rebirth" : DD_List()\DD_Filtered=DD_List()\DD_D1X
+      Case "OpenTyrian" : DD_List()\DD_Filtered=DD_List()\DD_Tyrian
+      Case "D1X_Rebirth" : DD_List()\DD_Filtered=DD_List()\DD_D1X
       Case "ScummVM" : DD_List()\DD_Filtered=DD_List()\DD_ScummVM
-      Case "American Laser Games" : DD_List()\DD_Filtered=DD_List()\DD_American
+      Case "American Laser Games / Nova" : DD_List()\DD_Filtered=DD_List()\DD_American
       Case "Conversion (LaserDisc)" : DD_List()\DD_Filtered=DD_List()\DD_Laser
       Case "Conversion (Arcade)" : DD_List()\DD_Filtered=DD_List()\DD_Arcade
       Case "Prototype" : DD_List()\DD_Filtered=DD_List()\DD_Prototype
-      Case "2MB RAM" : DD_List()\DD_Filtered=DD_List()\DD_2MB
-      Case "4MB RAM" : DD_List()\DD_Filtered=DD_List()\DD_4MB
       Case "PET Version" : DD_List()\DD_Filtered=DD_List()\DD_Pet
     EndSelect
     
@@ -1030,7 +1044,7 @@ Procedure Run_Game()
   params=""
   
   Select Window_Type
-
+      
     Case 2
       params+" -cfgparam gfx_fullscreen_amiga=fullwindow"
       params+" -cfgparam gfx_fullscreen_picasso=fullwindow"
@@ -1056,7 +1070,7 @@ Procedure Run_Game()
       params+" -cfgparam gfx_filter_aspect_ratio=-1:-1"
       params+" -cfgparam gfx_width_windowed=720"
       params+" -cfgparam gfx_height_windowed=576"
-            
+      
   EndSelect 
   
   If Not Use_Scanlines
@@ -1068,7 +1082,7 @@ Procedure Run_Game()
     params+" -cfgparam show_leds=0"
     params+" -cfgparam show_leds_rtg=0"
   EndIf
-    
+  
   full_path="-f "+#DOUBLEQUOTE$+GetTemporaryDirectory()+DD_List()\DD_Config+".uae"+#DOUBLEQUOTE$+floppy+gui+params
   
   program=RunProgram(WinUAE_Path, full_path ,"",#PB_Program_Open)
@@ -1223,6 +1237,7 @@ EndProcedure
 Procedure Save_Prefs()
   If FileSize(Home_Path+"DD_LAUNCH.prefs")>0 : DeleteFile(Home_Path+"DD_LAUNCH.prefs") : EndIf
   If CreateFile(0,Home_Path+"DD_LAUNCH.prefs")
+    WriteStringN(0,"*** The minimum GUI resolution is 1280x720. Anything less will be ignored. ***")
     WriteStringN(0,"Show_GUI="+Show_GUI)
     WriteStringN(0,"Window_Type="+Window_Type)
     WriteStringN(0,"Floppy_Speed="+Floppy_Speed)
@@ -1231,6 +1246,9 @@ Procedure Save_Prefs()
     WriteStringN(0,"Original_Names="+Original_Names)
     WriteStringN(0,"Use_Scanlines="+Use_Scanlines)
     WriteStringN(0,"Show_Leds="+Show_Leds)
+    WriteStringN(0,"Stretch_Window="+Stretch_Window)
+    WriteStringN(0,"Window_Width="+WinW)
+    WriteStringN(0,"Window_Height="+WinH)
     CloseFile(0)
   EndIf 
 EndProcedure
@@ -1242,14 +1260,17 @@ Procedure Load_Prefs()
   If OpenFile(0,Home_Path+"DD_LAUNCH.prefs")
     While Not Eof(0)
       input$=ReadString(0)
-      If FindString(input$,"Show_GUI=") : Show_GUI=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Window_Type=") : Window_Type=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Floppy_Speed=") : Floppy_Speed=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Close_Confirm=") : Close_Confirm=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Cover_Colour=") : Box_Colour=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Original_Names=") : Original_Names=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Use_Scanlines=") : Use_Scanlines=Val(StringField(input$,2,"=")) : EndIf
-      If FindString(input$,"Show_Leds=") : Show_Leds=Val(StringField(input$,2,"=")) : EndIf
+      If FindString(input$,"Show_GUI=") : Show_GUI=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_Type=") : Window_Type=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Floppy_Speed=") : Floppy_Speed=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Close_Confirm=") : Close_Confirm=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Cover_Colour=") : Box_Colour=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Original_Names=") : Original_Names=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Use_Scanlines=") : Use_Scanlines=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Show_Leds=") : Show_Leds=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Stretch_Window=") : Stretch_Window=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_Width=") : WinW=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_Height=") : WinH=Val(StringField(input$,2,Chr(61))) : EndIf
     Wend
     CloseFile(0)
   Else
@@ -1326,58 +1347,46 @@ Procedure File_Viewer(file.s)
   
 EndProcedure 
 
-Procedure Draw_Main_Window()
+Procedure Draw_Gadgets()
     
-  Protected winheight.i, winwidth.i, y.i
+  ListIconGadget(#MAIN_LIST,2,2,410,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
   
-  ExamineDesktops()
-  
-  winheight=DesktopUnscaledY(GetMaxWindowHeight())
-  
-  winwidth=(winheight/9)*16
-  
-  If winwidth<1368 And DesktopWidth(0)>1280 : winwidth=1352 : EndIf
-
-  OpenWindow(#MAIN_WINDOW, ((DesktopWidth(0)-winwidth)/2)-2, 5, winwidth , winheight-8, W_Title , #PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible)
-  
-  Pause_Window(#MAIN_WINDOW)
-
-  ListIconGadget(#MAIN_LIST,2,2,400,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
-  
-  y=(WindowHeight(#MAIN_WINDOW)-MenuHeight()-572)/2
-
   Protected gw.i
   Protected gh.i
-    
+  
   gh=WindowHeight(#MAIN_WINDOW)-MenuHeight()
   gw=(gh/4)*5
   
-  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+16,0,gw-10,gh+2)
+  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+46,0,gw-40,gh+2)
   
   CanvasGadget(#TITLE_GADGET     , 2, 2, (gw/2)-2, (gh/2)-0,#PB_Canvas_Border)
   CanvasGadget(#SCREENSHOT_GADGET, 2, (gh/2)+4, (gw/2)-0, (gh/2)-8,#PB_Canvas_Border)
   CanvasGadget(#BOXART_GADGET, (GadgetWidth(#MEDIA_CONTAINER)/2)+6, 2, (GadgetWidth(#MEDIA_CONTAINER)/2)-12, GadgetHeight(#MEDIA_CONTAINER)-8,#PB_Canvas_Border)
   
   CloseGadgetList()
-  
+    
   ResizeGadget(#MAIN_LIST,2,2,(WindowWidth(#MAIN_WINDOW)-GadgetWidth(#MEDIA_CONTAINER))+4,#PB_Ignore)
   
   FrameGadget(#FILTER_FRAME,2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,(GadgetWidth(#MAIN_LIST)/2)-2,50,"Filter (Press F10 For Search)")
   ComboBoxGadget(#MAIN_FILTER,6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,(GadgetWidth(#MAIN_LIST)/2)-10,24)
   
-  FrameGadget(#FLOPPY_FRAME,(GadgetWidth(#MAIN_LIST)/2)+2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,GadgetWidth(#MAIN_LIST)/2,50,"Floppy Speed (100%)")
+  FrameGadget(#FLOPPY_FRAME,(GadgetWidth(#MAIN_LIST)/2)+2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,GadgetWidth(#MAIN_LIST)/2,50,"")
   TrackBarGadget(#MAIN_FLOPPY,(GadgetWidth(#MAIN_LIST)/2)+6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-34,(GadgetWidth(#MAIN_LIST)/2)-10,20,1,5,#PB_TrackBar_Ticks)
-
+  
   SetGadgetState(#MAIN_FLOPPY,Floppy_Speed)
   
-  SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST))
+  Select Floppy_Speed
+    Case 1 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (Turbo)")
+    Case 2 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (100%)")
+    Case 3 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (200%)")
+    Case 4 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (400%)")
+    Case 5 : SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (800%)")
+  EndSelect
   
   AddGadgetItem(#MAIN_FILTER,-1,"None")
-  AddGadgetItem(#MAIN_FILTER,-1,"2MB RAM")
-  AddGadgetItem(#MAIN_FILTER,-1,"4MB RAM")
   AddGadgetItem(#MAIN_FILTER,-1,"AGA")
   AddGadgetItem(#MAIN_FILTER,-1,"Alpha")
-  AddGadgetItem(#MAIN_FILTER,-1,"American Laser Games")
+  AddGadgetItem(#MAIN_FILTER,-1,"American Laser Games / Nova")
   AddGadgetItem(#MAIN_FILTER,-1,"AmigaCD")
   AddGadgetItem(#MAIN_FILTER,-1,"AmiSpear")
   AddGadgetItem(#MAIN_FILTER,-1,"AmiWolf")
@@ -1401,25 +1410,22 @@ Procedure Draw_Main_Window()
   AddGadgetItem(#MAIN_FILTER,-1,"Conversion (NES)")
   AddGadgetItem(#MAIN_FILTER,-1,"Conversion (PDA)")
   AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Sega CD)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Sega MegaDrive)")
   AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Sharp X68000)")
+  AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Wii)")
   AddGadgetItem(#MAIN_FILTER,-1,"Conversion (Windows)")
   AddGadgetItem(#MAIN_FILTER,-1,"Cubo CD32")
-  AddGadgetItem(#MAIN_FILTER,-1,"D1X Rebirth")
+  AddGadgetItem(#MAIN_FILTER,-1,"D1X_Rebirth")
   AddGadgetItem(#MAIN_FILTER,-1,"Demo")
   AddGadgetItem(#MAIN_FILTER,-1,"Exult")
-  AddGadgetItem(#MAIN_FILTER,-1,"Full Game")
   AddGadgetItem(#MAIN_FILTER,-1,"Hack")
-  AddGadgetItem(#MAIN_FILTER,-1,"Hard Disk")
-  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 1")
-  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 3")
-  AddGadgetItem(#MAIN_FILTER,-1,"Intro Disk 4")
   AddGadgetItem(#MAIN_FILTER,-1,"JFSW")
   AddGadgetItem(#MAIN_FILTER,-1,"JFDuke3D")
   AddGadgetItem(#MAIN_FILTER,-1,"Modification")
   AddGadgetItem(#MAIN_FILTER,-1,"OCS/ECS")
-  AddGadgetItem(#MAIN_FILTER,-1,"Open Tyrian")
+  AddGadgetItem(#MAIN_FILTER,-1,"OpenTyrian")
   AddGadgetItem(#MAIN_FILTER,-1,"PET Version")
-  AddGadgetItem(#MAIN_FILTER,-1,"Pre Release")
+  AddGadgetItem(#MAIN_FILTER,-1,"Pre-Release")
   AddGadgetItem(#MAIN_FILTER,-1,"Preview")
   AddGadgetItem(#MAIN_FILTER,-1,"Prototype")
   AddGadgetItem(#MAIN_FILTER,-1,"RTG")
@@ -1430,7 +1436,7 @@ Procedure Draw_Main_Window()
   AddGadgetItem(#MAIN_FILTER,-1,"ZDoom")
   
   SetGadgetState(#MAIN_FILTER,0)
-
+  
   CreatePopupMenu(#DUMMY_MENU)
   
   CreateImageMenu(#MAIN_MENU, WindowID(#MAIN_WINDOW))
@@ -1463,6 +1469,7 @@ Procedure Draw_Main_Window()
   MenuItem(#MenuItem_19, "Show Scanlines")
   MenuItem(#MenuItem_20, "Show LEDs")
   MenuBar()
+  MenuItem(#MenuItem_7, "Stretch Window")
   MenuItem(#MenuItem_12, "Box Art Outline Colour")
   MenuBar()
   MenuItem(#MenuItem_11, "Close Confirmation")
@@ -1479,9 +1486,35 @@ Procedure Draw_Main_Window()
     Case 3 : SetMenuItemState(#MAIN_MENU,#MenuItem_15,Window_Type)
   EndSelect
   
+  SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
   SetMenuItemState(#MAIN_MENU,#MenuItem_19,Use_Scanlines)
   SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
   SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
+    
+EndProcedure
+
+Procedure Draw_Main_Window()
+  
+  Protected winheight.i, winwidth.i, y.i, win_params
+  
+  ExamineDesktops()
+  
+  If Stretch_Window
+    winheight=DesktopUnscaledY(GetMaxWindowHeight())
+    winwidth=(winheight/9)*16
+    If winwidth<1368 And DesktopWidth(0)>1280 : winwidth=1352 : EndIf
+    win_params=#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible
+  Else
+    If WinW<1280 : WinW=1280 : EndIf
+    If WinH<720 : WinH=720 : EndIf
+    winheight=DesktopUnscaledX(WinH)
+    winwidth=DesktopUnscaledY(WinW)
+    win_params=#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible | #PB_Window_ScreenCentered
+  EndIf
+  
+  OpenWindow(#MAIN_WINDOW, DesktopUnscaledX((DesktopWidth(0)/2)-(winwidth/2)-2), 5, winwidth , winheight-8, W_Title , win_params)
+  
+  Draw_Gadgets()
   
   CreateImage(#IFF_BLANK,DpiX(350), DpiY(564),32,#Black)
   StartDrawing(ImageOutput(#IFF_BLANK))
@@ -1511,7 +1544,7 @@ Procedure Draw_List()
       Else
         AddGadgetItem(#MAIN_LIST,-1,DD_List()\DD_Name+Title_Extras())
       EndIf
-      If Mod(ListIndex(DD_List()),2)=0 : SetGadgetItemColor(#MAIN_LIST,ListIndex(DD_List()),#PB_Gadget_BackColor,$EEEEEE,#PB_All) : EndIf
+      If Mod(CountGadgetItems(#MAIN_LIST),2)=0 : SetGadgetItemColor(#MAIN_LIST,CountGadgetItems(#MAIN_LIST)-1,#PB_Gadget_BackColor,$EEEEEE,#PB_All) : EndIf
       AddElement(List_Numbers())
       List_Numbers()=ListIndex(DD_List())
     EndIf
@@ -1519,6 +1552,13 @@ Procedure Draw_List()
   
   Resume_Gadget(#MAIN_LIST)
   
+  If GetWindowLongPtr_(GadgetID(#MAIN_LIST), #GWL_STYLE) & #WS_VSCROLL
+    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-20)
+  Else
+    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-4)
+  EndIf
+  
+  SetActiveGadget(#MAIN_LIST)
   SetGadgetState(#MAIN_LIST,0)
   
 EndProcedure
@@ -1542,7 +1582,7 @@ Procedure Process_UAE()
   change=#False
   
   Temp_Path=GetTemporaryDirectory()+"DD_Temp\"
-  New_Path=ReplaceString(Home_Path,"\","\\")
+  New_Path=ReplaceString(Home_Path,Chr(92),Chr(92)+Chr(92))
   
   ExamineDirectory(0,Home_Path+"Configurations\","*.uae")
   While NextDirectoryEntry(0)
@@ -1582,23 +1622,23 @@ Procedure Process_UAE()
           
           ForEach Old_Config()
             If FindString(Old_Config(),"floppy0=")
-              If StringField(Old_Config(),2,"=")<>""
-                DD_List()\DD_Folder=StringField(Old_Config(),3,"\")
+              If StringField(Old_Config(),2,Chr(61))<>""
+                DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92))
               EndIf
             EndIf
             
             If FindString(Old_Config(),"cdimage0=")
-              If StringField(Old_Config(),2,"=")<>""
-                DD_List()\DD_Folder=StringField(Old_Config(),3,"\")
+              If StringField(Old_Config(),2,Chr(61))<>""
+                DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92))
               EndIf
             EndIf
             
             If FindString(Old_Config(),"hardfile2=")
-              If StringField(Old_Config(),2,"=")<>""
+              If StringField(Old_Config(),2,Chr(61))<>""
                 If FindString(Old_Config(),".\\")
-                  DD_List()\DD_Folder=StringField(Old_Config(),5,"\")
+                  DD_List()\DD_Folder=StringField(Old_Config(),5,Chr(92))
                 EndIf
-                If FindString(Old_Config(),".\") And DD_List()\DD_Folder="" : DD_List()\DD_Folder=StringField(Old_Config(),3,"\") : EndIf
+                If FindString(Old_Config(),".\") And DD_List()\DD_Folder="" : DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92)) : EndIf
               EndIf
             EndIf
             
@@ -1652,13 +1692,14 @@ Procedure Scrape_DB()
   
   ForEach DD_List()
     DD_List()\DD_OCSECS=#True
+    If FindString(DD_List()\DD_Name,"AMIGA CD") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[ShapeShifter]") : DD_List()\DD_Shapeshifter=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[ShapeShifter]") : EndIf
     If FindString(DD_List()\DD_Name,"[RTG]") : DD_List()\DD_RTG=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[RTG]") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[AGA]") : DD_List()\DD_AGA=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[AGA]") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[CD32]") : DD_List()\DD_CD32=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[CD32]") : DD_List()\DD_OCSECS=#False : EndIf
-    If FindString(DD_List()\DD_Name,"[CDTV]") : DD_List()\DD_CDTV=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[CDTV]") : EndIf
+    If FindString(DD_List()\DD_Name,"[CDTV]") : DD_List()\DD_CDTV=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[CDTV]") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[AmigaCD]") : DD_List()\DD_AmigaCD=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[AmigaCD]") : DD_List()\DD_OCSECS=#False : EndIf
-    If FindString(DD_List()\DD_Name,"[Arcadia]") : DD_List()\DD_Arcadia=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Arcadia]") : EndIf
+    If FindString(DD_List()\DD_Name,"[Arcadia]") : DD_List()\DD_Arcadia=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Arcadia]") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[Cubo CD32]") : DD_List()\DD_Cubo=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Cubo CD32]") : DD_List()\DD_OCSECS=#False : EndIf 
     If FindString(DD_List()\DD_Name,"[unreleased]") : DD_List()\DD_Unreleased=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[unreleased]") : EndIf
     If FindString(DD_List()\DD_Name,"[pre-release]") : DD_List()\DD_PreRelease=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[pre-release]") : EndIf
@@ -1682,6 +1723,8 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[3DS conversion]") : DD_List()\DD_3DS=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[3DS conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[PDA conversion]") : DD_List()\DD_PDA=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[PDA conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Sega CD conversion]") : DD_List()\DD_SegaCD=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Sega CD conversion]") : EndIf
+    If FindString(DD_List()\DD_Name,"[Sega MegaDrive conversion]") : DD_List()\DD_Megadrive=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Sega MegaDrive conversion]") : EndIf
+    If FindString(DD_List()\DD_Name,"[Wii conversion]") : DD_List()\DD_Wii=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Wii conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[ZDoom]") : DD_List()\DD_ZDoom=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[ZDoom]") : EndIf
     If FindString(DD_List()\DD_Name,"[Chocolate Doom]") : DD_List()\DD_CDoom=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Chocolate Doom]") : EndIf
     If FindString(DD_List()\DD_Name,"[JFSW]") : DD_List()\DD_JFSW=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[JFSW]") : EndIf
@@ -1693,7 +1736,8 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[AmiWolf]") : DD_List()\DD_AmiWolf=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[AmiWolf]") : EndIf
     If FindString(DD_List()\DD_Name,"[ScummVM]") : DD_List()\DD_ScummVM=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[ScummVM]") : EndIf
     If FindString(DD_List()\DD_Name,"[OpenTyrian]") : DD_List()\DD_Tyrian=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[OpenTyrian]") : EndIf
-    If FindString(DD_List()\DD_Name,"[American Laser Games]") : DD_List()\DD_American=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[American Laser Games]") : EndIf
+    If FindString(DD_List()\DD_Name,"[American Laser Games]") : DD_List()\DD_American=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[American Laser Games]") : DD_List()\DD_OCSECS=#False : EndIf
+    If FindString(DD_List()\DD_Name,"[Nova]") : DD_List()\DD_American=#True : DD_List()\DD_Nova=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Nova]") : DD_List()\DD_OCSECS=#False : EndIf
     If FindString(DD_List()\DD_Name,"[LaserDisc conversion]") : DD_List()\DD_Laser=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[LaserDisc conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[Arcade conversion]") : DD_List()\DD_Arcade_Conv=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[Arcade conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[prototype]") : DD_List()\DD_Prototype=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[prototype]") : EndIf
@@ -1754,7 +1798,7 @@ If FileSize(".\Configurations\")=-2
   ResizeImage(#TEXT_IMAGE,16,16)
   
   Load_Prefs()
-  
+    
   Draw_Main_Window()
   
   If FileSize(Home_Path+"DD_DB.dat")>0 And FileSize(Home_Path+"DD_CONFIGS.dat")>0
@@ -1772,12 +1816,6 @@ If FileSize(".\Configurations\")=-2
   
   HideWindow(#MAIN_WINDOW,#False)
   
-  SetActiveWindow(#MAIN_WINDOW)
-  SetActiveGadget(#MAIN_LIST)
-  SetGadgetState(#MAIN_LIST,0)
-  
-  Resume_Window(#MAIN_WINDOW)
-  
 Else
   
   MessageRequester("Error","Cannot find configurations folder!",#PB_MessageRequester_Ok|#PB_MessageRequester_Error)
@@ -1793,6 +1831,8 @@ Repeat
   event=WaitWindowEvent()
   
   Select event
+      
+
       
     Case #WM_KEYDOWN
       If CountGadgetItems(#MAIN_LIST)>0
@@ -1824,10 +1864,10 @@ Repeat
           EndIf;}
         Case #MenuItem_2  ;{- About
           If #PB_Compiler_Processor=#PB_Processor_x64
-            MessageRequester("About", W_Title+" (64Bit Version)"+#CRLF$+#CRLF$+"© 2021 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
+            MessageRequester("About", W_Title+" (64Bit Version)"+#CRLF$+#CRLF$+"© 2022 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
           EndIf
           If #PB_Compiler_Processor=#PB_Processor_x86
-            MessageRequester("About", W_Title+" (32Bit Version)"+#CRLF$+#CRLF$+"© 2021 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
+            MessageRequester("About", W_Title+" (32Bit Version)"+#CRLF$+#CRLF$+"© 2022 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
           EndIf
           ;}
         Case #MenuItem_16 ;{- Help
@@ -1887,6 +1927,7 @@ Repeat
           Draw_Info()
           ;} 
         Case #MenuItem_6  ;{- Show GUI
+          
           If Show_GUI
             Show_GUI=#False
           Else
@@ -1894,6 +1935,19 @@ Repeat
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_6,Show_GUI)
           ;}   
+        Case #MenuItem_7  ;{- Stretch Window
+          If Stretch_Window
+            Stretch_Window=#False
+          Else
+            Stretch_Window=#True
+          EndIf
+          SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
+          CloseWindow(#MAIN_WINDOW)
+          Draw_Main_Window()
+          Draw_List()
+          Draw_Info()
+          HideWindow(#MAIN_WINDOW,#False)
+          ;} 
         Case #MenuItem_14 ;{- Full Screen
           Window_Type=1
           SetMenuItemState(#MAIN_MENU,#MenuItem_14,#True)
@@ -1953,12 +2007,12 @@ Repeat
           SetMenuItemState(#MAIN_MENU,#MenuItem_19,Use_Scanlines)
           ;}
         Case #MenuItem_20 ;{- LEDs toggle
-           If Show_Leds
-             Show_Leds=#False
-           Else
-             Show_Leds=#True
-           EndIf
-           SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
+          If Show_Leds
+            Show_Leds=#False
+          Else
+            Show_Leds=#True
+          EndIf
+          SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
           ;}
         Case 900 To 930 : File_Viewer(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+GetMenuItemText(#POPUP_MENU,EventMenu()))
       EndSelect
@@ -2112,29 +2166,34 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 4 (Windows - x64)
-; CursorPosition = 150
-; FirstLine = 126
-; Folding = AAAAAAAg
+; CursorPosition = 1350
+; FirstLine = 430
+; Folding = AAAACAAA+
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDLaunch_test.exe
+; Executable = I:\WinUAE\DDLaunch64.exe
+; CommandLine = -c "demo"
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x86)
+; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x64)
 ; Debugger = Standalone
 ; IncludeVersionInfo
-; VersionField0 = 1.0.0.0
-; VersionField1 = 1.0.0.0
+; VersionField0 = 1.4.0.0
+; VersionField1 = 1.4.0.0
 ; VersionField2 = MrV2k
 ; VersionField3 = DDLaunch
-; VersionField4 = 1.0
-; VersionField5 = 1.0
+; VersionField4 = 1.4
+; VersionField5 = 1.4
 ; VersionField6 = Game Launcher For Damien D's Collection
 ; VersionField7 = DDLaunch
 ; VersionField8 = DDLaunch
-; VersionField9 = 2021 Paul Vince
+; VersionField9 = 2022 Paul Vince
+; VersionField10 = -
+; VersionField11 = -
+; VersionField12 = -
+; VersionField13 = -
 ; VersionField14 = https://easyemu.mameworld.info
 ; VersionField16 = VFT_APP
 ; VersionField17 = 0809 English (United Kingdom)
