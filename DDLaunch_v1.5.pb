@@ -1,6 +1,6 @@
 ;- **** DDLaunch ****
 ;
-; Version 1.4
+; Version 1.5
 ;
 ; © 2021 Paul Vince (MrV2k)
 ;
@@ -160,12 +160,25 @@
 ;
 ; v1.5
 ; -----
-; 1. Fixed image gadget scaling.
+; 1. Fixed image and image gadget scaling.
 ; 2. Full window image scaling now changeable between default and stretched.
 ; 3. Full window image width scales to the desktop resolution.
 ; 4. Scanline width adapts to vertical desktop resolution.
-; 5. Added icon to border colour menu entry
-; 6. Fixed JFDuke3D error in scrape procedure
+; 5. Added icon to border colour menu entry.
+; 6. Fixed JFDuke3D error in scrape procedure.
+; 7. Minimum/Default window size is now 1280x720.
+; 8. Changed 'Save Settings' icon and moved to file menu.
+; 9. GUI is now fully resizable and supports Windows maximize and scaling.
+; 10. Removed 'Stretch Window' as no longer necessary.
+; 11. Window size and position is now saved in prefs file.
+; 12. File viewer window now has a minimum size of 700x600.
+; 13. Added 'Swap End To F11' menu option and run program parameters.
+; 14. Added 'Use Alt + F4 to close' menu option and run program parameters
+; 15. Removed a few more unnecessary procedures.
+; 16. Improved and optimized the info loading procedure. 
+; 17. Added floppy sounds and volume menu options and run program parameters.
+; 18. Updated DDLaunch.txt file to reflect all the GUI changes.
+; 19. Removed 'Full-Window Stretch' as the game screen position is no longer an issue due to fixed screen aspect ratio.
 
 EnableExplicit
 
@@ -177,14 +190,24 @@ Enumeration
   #MAIN_FILTER
   #MAIN_LIST
   #MAIN_FLOPPY
-  #MAIN_PANEL
+  #MAIN_SPLITTER
+  
+  #LIST_CONTAINER
+  #MEDIA_CONTAINER
+  
   #FLOPPY_FRAME
   #FILTER_FRAME
+  
   #TITLE_GADGET
   #SCREEN_GADGET
   #BOXART_GADGET
   
-  #MEDIA_CONTAINER
+  #SIZE_WINDOW
+  #SIZE_WIDTH_STRING
+  #SIZE_HEIGHT_STRING
+  #SIZE_OK_BUTTON
+  #SIZE_CANCEL_BUTTON
+  
   #POPUP_WINDOW
   #PROGRESS_WINDOW
   #FILE_WINDOW_01
@@ -208,7 +231,10 @@ Enumeration
   #FILE_WEBGADGET_09
   #FILE_WEBGADGET_10
   #RUN_WINDOW
-  #IFF_IMAGE
+  #BOXART_IMAGE
+  #SCREEN_IMAGE
+  #TITLE_IMAGE
+  #OUTPUT_IMAGE
   #IFF_BLANK
   #IFF_POPUP
   
@@ -224,6 +250,7 @@ Enumeration
   #HELP_IMAGE
   #CLOSE_IMAGE
   #IMAGE_IMAGE
+  #SAVE_IMAGE
   #BORDER_IMAGE
   
   #MAIN_MENU
@@ -255,6 +282,12 @@ Enumeration FormMenu
   #MenuItem_20
   #MenuItem_21
   #MenuItem_22
+  #MenuItem_23
+  #MenuItem_24
+  #MenuItem_25
+  #MenuItem_26
+  #MenuItem_27
+  #MenuItem_28
   #Menu_01=900
   #Menu_02
   #Menu_03
@@ -292,8 +325,7 @@ EndEnumeration
 
 Global Version.s="v1.5"
 Global W_Title.s="DDLaunch "+Version
-Global event.i, count.i, i.i, path.s, Window_Type.b, Program.i
-Global Docs_Text.i, Docs_Text2.i
+Global event.i, count.i, i.i, path.s, Program.i
 
 Global Home_Path.s=GetCurrentDirectory()
 Global WinUAE_Path.s=Home_Path+"winuae.exe"
@@ -301,7 +333,7 @@ Global Config_Path.s=Home_Path+"Configurations\"
 Global Game_Path.s=Home_Path+"Games\"
 Global UnRAR_Path.s=Home_Path+"UnRAR.exe"
 
-Global Window_Type=1
+Global Window_Type.b=1
 Global Search_Name.s=""
 Global Floppy_Speed.i=2
 Global Show_GUI.b=#False
@@ -310,10 +342,15 @@ Global Box_Colour=$0000FF
 Global Original_Names.b=#True
 Global Use_Scanlines.b=#True
 Global Show_Leds.b=#True
-Global Stretch_Window.b=#True
-Global FW_Scaling.b=#False
-Global WinW=1366
-Global WinH=768
+Global End_To_F11.b=#False
+Global Alt_F4.b=#False
+Global Floppy_Sounds.b=#False
+Global Floppy_Volume.i=1
+Global WinW=1280
+Global WinH=720
+Global WinX=-1
+Global WinY=-1
+Global WinMax=0
 
 ;- **** Structures ****
 
@@ -382,6 +419,7 @@ Structure DD_Data
   DD_Nova.b
   DD_Megadrive.b
   DD_Wii.b
+  DD_256_Color.b
 EndStructure
 
 Structure UData
@@ -389,8 +427,11 @@ Structure UData
   List Update_Folder.s()
 EndStructure
 
+;- **** Lists ****
+
 Global NewList DD_List.DD_Data()
 Global NewList List_Numbers.i()
+Global NewList Doc_List.s()
 
 ;- **** Macros ****
 
@@ -434,70 +475,16 @@ Macro Resume_Gadget(gadget)
   RedrawWindow_(GadgetID(gadget),#Null,#Null,#RDW_INVALIDATE)
 EndMacro
 
-Procedure Max(a, b)
-  If a > b
-    ProcedureReturn a
-  Else
-    ProcedureReturn b
-  EndIf
-EndProcedure
+Macro Get_Window_Sizes()
+  
+  WinX=WindowX(#MAIN_WINDOW)
+  WinY=WindowY(#MAIN_WINDOW)   
+  WinW=WindowWidth(#MAIN_WINDOW)
+  WinH=WindowHeight(#MAIN_WINDOW)
+  
+EndMacro
 
 ;- **** Procedures ****
-
-Procedure GetRequiredSize(Gadget, *Width.LONG, *Height.LONG, Flags = 0)
-  
-  Protected DC = GetDC_(GadgetID(Gadget))
-  Protected oldFont = SelectObject_(DC, GetGadgetFont(Gadget)) 
-  Protected Size.SIZE, index, Line$, LineSize.SIZE
-  
-  Select GadgetType(Gadget)
-      
-    Case #PB_GadgetType_Text
-      Protected Text$ = RemoveString(GetGadgetText(Gadget), Chr(10))
-      Protected count = CountString(Text$, Chr(13)) + 1
-      Protected empty = 0
-      Protected maxheight = 0 
-      For index = 1 To count 
-        Line$ = StringField(Text$, index, Chr(13))
-        If Line$ = ""
-          empty + 1
-        Else 
-          GetTextExtentPoint32_(DC, @Line$, Len(Line$), @LineSize.SIZE)
-          Size\cx = Max(Size\cx, LineSize\cx)
-          Size\cy + LineSize\cy
-          maxheight = Max(maxheight, LineSize\cy)
-        EndIf
-      Next index            
-      Size\cy + empty * maxheight  
-      
-      If Flags & #PB_Text_Border
-        Size\cx + GetSystemMetrics_(#SM_CXEDGE) * 2
-        Size\cy + GetSystemMetrics_(#SM_CYEDGE) * 2
-      Else           
-        Size\cx + 2
-        Size\cy + 2
-      EndIf
-      
-  EndSelect
-  
-  SelectObject_(DC, oldFont)
-  ReleaseDC_(GadgetID(Gadget), DC)
-  *Width\l  = Size\cx
-  *Height\l = Size\cy
-  
-EndProcedure
-
-Procedure GetRequiredWidth(Gadget, Flags = 0)
-  Protected Width.l, Height.l
-  GetRequiredSize(Gadget, @Width, @Height, Flags)
-  ProcedureReturn Width
-EndProcedure 
-
-Procedure GetRequiredHeight(Gadget, Flags = 0)
-  Protected Width.l, Height.l
-  GetRequiredSize(Gadget, @Width, @Height, Flags)
-  ProcedureReturn Height
-EndProcedure 
 
 Procedure GetMaxWindowHeight()
   
@@ -519,6 +506,10 @@ EndProcedure
 Procedure.s Title_Extras()
   
   Protected extras.s=""
+  
+  If DD_List()\DD_256_Color
+    extras+" [256 Colour]"
+  EndIf
   
   If DD_List()\DD_AGA
     extras+" [AGA]"
@@ -859,22 +850,74 @@ Procedure ResizeImgAR(ImgID.l,width.l,height.l)
   
 EndProcedure  
 
+Procedure Scale_Boxart(dox.b)
+  
+  Protected scale.f, offset.i, box_x.i, box_w.i, img_width.i, img_height.i, x_size.i, x.i, y.i
+  
+  box_x=GadgetHeight(#BOXART_GADGET)
+  box_w=GadgetWidth(#BOXART_GADGET)
+  scale=box_w/ImageWidth(#OUTPUT_IMAGE)
+  x_size=GadgetHeight(#BOXART_GADGET)
+  If Int(ImageHeight(#OUTPUT_IMAGE)*scale)>550
+    offset=(x_size-Int(ImageHeight(#OUTPUT_IMAGE)*scale))/2
+    img_height=x_size
+  Else 
+    offset=(x_size-Int(ImageHeight(#OUTPUT_IMAGE)*scale))/2
+    img_height=Int(ImageHeight(#OUTPUT_IMAGE)*scale)
+  EndIf
+  
+  If IsImage(#OUTPUT_IMAGE)
+    img_height=(DpiY(ImageHeight(#OUTPUT_IMAGE))-4)*scale
+    img_width=DpiX(GadgetWidth(#BOXART_GADGET)-4)
+    If img_height>DpiY(GadgetHeight(#BOXART_GADGET))
+      ResizeImgAR(#OUTPUT_IMAGE,DpiX(GadgetWidth(#BOXART_GADGET))-4,DpiY(GadgetHeight(#BOXART_GADGET)-6))
+      y=0
+      x=(DpiY(GadgetWidth(#BOXART_GADGET))-ImageWidth(#OUTPUT_IMAGE))/2
+    Else
+      ResizeImage(#OUTPUT_IMAGE,img_width, img_height,#PB_Image_Smooth)
+      x=0
+      y=(DpiY(GadgetHeight(#BOXART_GADGET))-ImageHeight(#OUTPUT_IMAGE))/2
+    EndIf
+    StartDrawing(CanvasOutput(#BOXART_GADGET))
+    Box(0,0,DpiX(GadgetWidth(#BOXART_GADGET)),DpiY(GadgetHeight(#BOXART_GADGET)),#Black)
+
+    If x<0 : x=0 : EndIf
+    DrawImage(ImageID(#OUTPUT_IMAGE),x,y)
+    DrawingMode(#PB_2DDrawing_Outlined)
+    Box(x,y,ImageWidth(#OUTPUT_IMAGE),ImageHeight(#OUTPUT_IMAGE),Box_Colour)
+    DrawingMode(#PB_2DDrawing_AlphaBlend)
+    If dox
+      DrawImage(ImageID(#DOC_IMAGE),ImageWidth(#OUTPUT_IMAGE)-35,3)
+    EndIf
+    StopDrawing()
+  EndIf
+  
+EndProcedure
+
+Procedure Canvas_Blank(gadget.l)
+  
+  StartDrawing(CanvasOutput(gadget))  
+  Box(0,0,DpiX(GadgetWidth(gadget)),DpiY(GadgetHeight(gadget)),#Black)
+  FrontColor(#Red)
+  DrawText(5,5,"No Image")
+  StopDrawing()
+  
+EndProcedure
+
 Procedure Draw_Info()
   
-  Protected Info_Dir.i, Output$, docs_path.s, sshot_path.s, title_path.s, boxart_path.s,x,y
-  Protected NewList Doc_List.s()
+  Protected Info_Dir.i
+  
+  ClearList(Doc_List())
   
   Get_Game_Number()
   
-  If IsGadget(#MAIN_PANEL) : Pause_Gadget(#MAIN_PANEL) : EndIf
-  
-  If IsImage(#IFF_IMAGE) : FreeImage(#IFF_IMAGE) : EndIf
-  
+  If IsImage(#TITLE_IMAGE) : FreeImage(#TITLE_IMAGE) : EndIf
+  If IsImage(#SCREEN_IMAGE) : FreeImage(#SCREEN_IMAGE) : EndIf
+  If IsImage(#BOXART_IMAGE) : FreeImage(#BOXART_IMAGE) : EndIf
   If IsMenu(#POPUP_MENU) : FreeMenu(#POPUP_MENU) : EndIf  
-  
-  docs_path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"
-  
-  Info_Dir=ExamineDirectory(#PB_Any,docs_path,"*.*")
+    
+  Info_Dir=ExamineDirectory(#PB_Any,Home_Path+"Games\"+DD_List()\DD_Folder+"\","*.*")
   
   While NextDirectoryEntry(Info_Dir)
     If DirectoryEntryType(Info_Dir)=#PB_DirectoryEntry_File
@@ -904,114 +947,48 @@ Procedure Draw_Info()
     Next  
   EndIf
   
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")>0
-    title_path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png"
-  EndIf
-  
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.jpg")>0
-    title_path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.jpg"
-  EndIf
-  
-  If FileSize(title_path)>-1 And ListSize(List_Numbers())>0
-    LoadImage(#IFF_IMAGE,title_path)      
-  Else
-    CopyImage(#IFF_BLANK,#IFF_IMAGE)
-  EndIf
-  
-  If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET)), DpiY(GadgetHeight(#TITLE_GADGET)),#PB_Image_Smooth)
-    StartDrawing(CanvasOutput(#TITLE_GADGET))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET)), DpiY(GadgetHeight(#TITLE_GADGET)))
-    StopDrawing()
-  EndIf
-  
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")>0
-    sshot_path.s=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png"
-  EndIf
-  
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.jpg")>0
-    sshot_path.s=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.jpg"
-  EndIf
-  
-  If FileSize(sshot_path.s)>-1 And ListSize(List_Numbers())>0
-    LoadImage(#IFF_IMAGE,sshot_path.s)      
-  Else
-    CopyImage(#IFF_BLANK,#IFF_IMAGE)
-  EndIf
-  
-  If IsImage(#IFF_IMAGE)
-    ResizeImage(#IFF_IMAGE,DpiX(GadgetWidth(#SCREEN_GADGET)), DpiY(GadgetHeight(#SCREEN_GADGET)),#PB_Image_Raw)
-    StartDrawing(CanvasOutput(#SCREEN_GADGET))
-    DrawImage(ImageID(#IFF_IMAGE),0,0,DpiX(GadgetWidth(#SCREEN_GADGET)), DpiY(GadgetHeight(#SCREEN_GADGET)))
-    StopDrawing()
-  EndIf
-  
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.png")>0
-    boxart_path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.png"
-  EndIf
-  
-  If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
-    boxart_path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg"
-  EndIf
-  
-  If FileSize(boxart_path)>-1 And ListSize(List_Numbers())>0
-    LoadImage(#IFF_IMAGE,boxart_path)      
-  Else
-    CopyImage(#IFF_BLANK,#IFF_IMAGE)
-  EndIf
-  
-  Protected scale.f, offset.i, box_x.i, box_w.i, img_width.i, img_height.i, x_size.i
-  
-  box_x=GadgetHeight(#BOXART_GADGET)
-  box_w=GadgetWidth(#BOXART_GADGET)
-  scale=box_w/ImageWidth(#IFF_IMAGE)
-  x_size=GadgetHeight(#BOXART_GADGET)
-  If Int(ImageHeight(#IFF_IMAGE)*scale)>550
-    offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-    img_height=x_size
-  Else 
-    offset=(x_size-Int(ImageHeight(#IFF_IMAGE)*scale))/2
-    img_height=Int(ImageHeight(#IFF_IMAGE)*scale)
-  EndIf
-  
-  If IsImage(#IFF_IMAGE)
-    img_height=(DpiY(ImageHeight(#IFF_IMAGE))-4)*scale
-    img_width=DpiX(GadgetWidth(#BOXART_GADGET)-4)
-    If img_height>DpiY(GadgetHeight(#BOXART_GADGET))
-      ResizeImgAR(#IFF_IMAGE,DpiX(GadgetWidth(#BOXART_GADGET))-4,DpiY(GadgetHeight(#BOXART_GADGET)-6))
-      y=0
-      x=(DpiY(GadgetWidth(#BOXART_GADGET))-ImageWidth(#IFF_IMAGE))/2
+  If ListSize(List_Numbers())>0
+    
+    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")>0
+      LoadImage(#TITLE_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")
+      CopyImage(#TITLE_IMAGE,#OUTPUT_IMAGE)
+      ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4,#PB_Image_Smooth)
+      StartDrawing(CanvasOutput(#TITLE_GADGET))
+      DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
+      StopDrawing()  
+      FreeImage(#OUTPUT_IMAGE)    
     Else
-      ResizeImage(#IFF_IMAGE,img_width, img_height,#PB_Image_Smooth)
-      x=0
-      y=(DpiY(GadgetHeight(#BOXART_GADGET))-ImageHeight(#IFF_IMAGE))/2
+      Canvas_Blank(#TITLE_GADGET)
     EndIf
-    StartDrawing(CanvasOutput(#BOXART_GADGET))
-    Box(0,0,DpiX(GadgetWidth(#BOXART_GADGET)),DpiY(GadgetHeight(#BOXART_GADGET)),#Black)
     
-    
-    If x<0 : x=0 : EndIf
-    DrawImage(ImageID(#IFF_IMAGE),x,y)
-    DrawingMode(#PB_2DDrawing_Outlined)
-    Box(x,y,ImageWidth(#IFF_IMAGE),ImageHeight(#IFF_IMAGE),Box_Colour)
-    DrawingMode(#PB_2DDrawing_AlphaBlend)
-    If ListSize(Doc_List())>0
-      DrawImage(ImageID(#DOC_IMAGE),ImageWidth(#IFF_IMAGE)-35,3)
+    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")>0
+      LoadImage(#SCREEN_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")        
+      CopyImage(#SCREEN_IMAGE,#OUTPUT_IMAGE)
+      ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4,#PB_Image_Raw)
+      StartDrawing(CanvasOutput(#SCREEN_GADGET))
+      DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4)
+      StopDrawing()  
+      FreeImage(#OUTPUT_IMAGE)
+    Else
+      Canvas_Blank(#SCREEN_GADGET)
     EndIf
-    StopDrawing()
+    
+    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
+      LoadImage(#BOXART_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")         
+      CopyImage(#BOXART_IMAGE,#OUTPUT_IMAGE)
+      If ListSize(Doc_List())>0
+        Scale_Boxart(#True)
+      Else
+        Scale_Boxart(#False)
+      EndIf     
+      FreeImage(#OUTPUT_IMAGE)
+    Else
+      Canvas_Blank(#BOXART_GADGET)
+    EndIf
+    
   EndIf
-  
-  CreateImage(#IFF_BLANK,DpiX(360), DpiY(450),32,#Black)
-  StartDrawing(ImageOutput(#IFF_BLANK))
-  FrontColor(#Red)
-  DrawText(0,0,"No Image")
-  StopDrawing()
-  
-  If IsGadget(#MAIN_PANEL) : Resume_Gadget(#MAIN_PANEL) : EndIf
   
   SetWindowTitle(#MAIN_WINDOW,W_Title+" - Showing ("+Str(ListSize(List_Numbers()))+" of "+Str(ListSize(DD_List()))+" Games)")
-  
-  FreeList(Doc_List())
   
 EndProcedure
 
@@ -1030,7 +1007,9 @@ EndProcedure
 
 Procedure Run_Game()
   
-  Protected old_pos.i, floppy.s, gui.s, config.s, full_path.s, params.s, DRes.s, Width_Scale.s, Scanline_Ratio.s
+  ExamineDesktops()
+  
+  Protected old_pos.i, floppy.s, gui.s, config.s, full_path.s, params.s, DRes.s, Width_Scale.s, Scanline_Ratio.s, F_Vol.s
   
   old_pos=GetGadgetState(#MAIN_LIST)
   
@@ -1065,7 +1044,7 @@ Procedure Run_Game()
     Case "1280x720"  : width_scale="0.875000"
       
   EndSelect
-
+  
   Select Floppy_Speed
     Case 1 : floppy=" -s floppy_speed=0"
     Case 2 : floppy=""
@@ -1079,25 +1058,19 @@ Procedure Run_Game()
   params=""
   
   Select Window_Type
-            
+      
     Case 2
       params+" -cfgparam gfx_fullscreen_amiga=fullwindow"
       params+" -cfgparam gfx_fullscreen_picasso=fullwindow"
       params+" -cfgparam win32.rtg_scale_aspect_ratio="
       params+" -cfgparam win32.rtg_scale_small=true"
-      
-      If FW_Scaling
-        params+" -cfgparam gfx_filter_autoscale=scale"
-      Else
-        params+" -cfgparam gfx_filter_vert_zoom_multf=0.000000"
-        params+" -cfgparam gfx_filter_horiz_zoom_multf="+width_scale
-      EndIf
-      
+      params+" -cfgparam gfx_filter_vert_zoom_multf=0.000000"
+      params+" -cfgparam gfx_filter_horiz_zoom_multf="+width_scale      
       params+" -cfgparam gfx_filter_aspect_ratio=-1:-1"
       
       If Use_Scanlines
         params+" -cfgparam gfx_filter_scanlines=50"
-        If DesktopHeight(0)>1200
+        If DesktopHeight(0)>=1080
           params+" -cfgparam gfx_filter_scanlineratio=49"
         EndIf
         params+" -cfgparam gfx_filter_scanlines_rtg=50"
@@ -1114,12 +1087,8 @@ Procedure Run_Game()
       params+" -cfgparam gfx_filter_aspect_ratio=-1:-1"
       params+" -cfgparam gfx_width_windowed=720"
       params+" -cfgparam gfx_height_windowed=568"
-      
-      If FW_Scaling
-        params+" -cfgparam gfx_filter_autoscale=scale"
-      Else
-        params+" -cfgparam gfx_filter_vert_zoom_multf=0.000000"
-      EndIf
+      params+" -cfgparam gfx_filter_vert_zoom_multf=0.000000"
+
       
   EndSelect 
   
@@ -1132,6 +1101,33 @@ Procedure Run_Game()
     params+" -cfgparam show_leds=0"
     params+" -cfgparam show_leds_rtg=0"
   EndIf
+  
+  If End_To_F11
+    params+" -cfgparam input.config=1"
+    params+" -cfgparam input.1.keyboard.0.friendlyname=WinUAE keyboard"
+    params+" -cfgparam input.1.keyboard.0.name=NULLKEYBOARD"
+    params+" -cfgparam input.1.keyboard.0.button.87.F11=SPC_QUALIFIER_SPECIAL.0"
+  EndIf
+  
+  If Alt_F4
+    params+" -cfgparam win32.ctrl_f11_is_quit=false"
+  EndIf
+  
+  If Floppy_Sounds
+    params+" -cfgparam floppy0sound=1"
+    params+" -cfgparam floppy1sound=1"
+    params+" -cfgparam floppy2sound=1"
+    Select Floppy_Volume
+      Case 1 : F_Vol="75"
+      Case 2 : F_Vol="66"
+      Case 3 : F_Vol="50"
+      Case 4 : F_Vol="33"
+      Case 5 : F_Vol="25"
+      Case 6 : F_Vol="0"
+    EndSelect
+    params+" -cfgparam floppy_volume="+F_Vol
+  EndIf
+        
   
   full_path="-f "+#DOUBLEQUOTE$+GetTemporaryDirectory()+DD_List()\DD_Config+".uae"+#DOUBLEQUOTE$+floppy+gui+params
   
@@ -1285,6 +1281,10 @@ Procedure Save_DB()
 EndProcedure
 
 Procedure Save_Prefs()
+  
+  If WinX<0 : WinX=0 : EndIf
+  If WinY<0 : WinY=0 : EndIf
+  
   If FileSize(Home_Path+"DD_LAUNCH.prefs")>0 : DeleteFile(Home_Path+"DD_LAUNCH.prefs") : EndIf
   If CreateFile(0,Home_Path+"DD_LAUNCH.prefs")
     WriteStringN(0,"*** The minimum GUI resolution is 1280x720. Anything less will be ignored. ***")
@@ -1296,12 +1296,18 @@ Procedure Save_Prefs()
     WriteStringN(0,"Original_Names="+Original_Names)
     WriteStringN(0,"Use_Scanlines="+Use_Scanlines)
     WriteStringN(0,"Show_Leds="+Show_Leds)
-    WriteStringN(0,"Stretch_Window="+Stretch_Window)
+    WriteStringN(0,"Floppy_Sounds="+Floppy_Sounds)
+    WriteStringN(0,"Floppy_Volume="+Floppy_Volume)
+    WriteStringN(0,"Use_Alt_F4="+Alt_F4)
+    WriteStringN(0,"Swap_End_F11="+End_To_F11)
     WriteStringN(0,"Window_Width="+WinW)
     WriteStringN(0,"Window_Height="+WinH)
-    WriteStringN(0,"FW_Scaling="+FW_Scaling)
+    WriteStringN(0,"Window_X="+WinX)
+    WriteStringN(0,"Window_Y="+WinY)
+    WriteStringN(0,"Window_Max="+GetWindowState(#MAIN_WINDOW))
     CloseFile(0)
   EndIf 
+  
 EndProcedure
 
 Procedure Load_Prefs()
@@ -1318,11 +1324,16 @@ Procedure Load_Prefs()
       If FindString(input$,"Cover_Colour=") : Box_Colour=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Original_Names=") : Original_Names=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Use_Scanlines=") : Use_Scanlines=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Use_Alt_F4=") : Alt_F4=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Swap_End_F11=") : End_To_F11=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Show_Leds=") : Show_Leds=Val(StringField(input$,2,Chr(61))) : EndIf
-      If FindString(input$,"Stretch_Window=") : Stretch_Window=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Floppy_Sounds=") : Floppy_Sounds=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Floppy_Volume=") : Floppy_Volume=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Window_Width=") : WinW=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Window_Height=") : WinH=Val(StringField(input$,2,Chr(61))) : EndIf
-      If FindString(input$,"FW_Scaling=") : FW_Scaling=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_X=") : WinX=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_Y=") : WinY=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Window_Max=") : WinMax=Val(StringField(input$,2,Chr(61))) : EndIf
     Wend
     CloseFile(0)
   Else
@@ -1389,6 +1400,7 @@ Procedure File_Viewer(file.s)
   EndIf
   
   OpenWindow(f_window,0,0,700,600,"File Viewer ("+GetFilePart(file)+")",#PB_Window_SystemMenu|#PB_Window_SizeGadget|#PB_Window_MinimizeGadget|#PB_Window_MaximizeGadget|#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
+  WindowBounds(f_window,700,600,#PB_Ignore,#PB_Ignore)
   Pause_Window(f_window)
   WebGadget(f_gadget,0,0,700,600,"file://"+file)
   Resume_Window(f_window)
@@ -1399,9 +1411,111 @@ Procedure File_Viewer(file.s)
   
 EndProcedure 
 
+Procedure OnMoveWindow() ; <----------------------------------------------> Gets the gadget coordinates when gadget is moved
+  
+  Select EventWindow()
+      
+    Case #MAIN_WINDOW
+      
+      Get_Window_Sizes()
+      
+  EndSelect
+  
+EndProcedure
+
+Procedure OnSizeWindow() ; <----------------------------------------------> Resizes The Gadgets When The Window Is Resized
+  
+  Select EventWindow()
+      
+    Case #FILE_WINDOW_01 : Pause_Window(#FILE_WINDOW_01) : ResizeGadget(#FILE_WEBGADGET_01,0,0,WindowWidth(#FILE_WINDOW_01),WindowHeight(#FILE_WINDOW_01)) : Resume_Window(#FILE_WINDOW_01)
+    Case #FILE_WINDOW_02 : Pause_Window(#FILE_WINDOW_02) : ResizeGadget(#FILE_WEBGADGET_02,0,0,WindowWidth(#FILE_WINDOW_02),WindowHeight(#FILE_WINDOW_02)) : Resume_Window(#FILE_WINDOW_02)
+    Case #FILE_WINDOW_03 : Pause_Window(#FILE_WINDOW_03) : ResizeGadget(#FILE_WEBGADGET_03,0,0,WindowWidth(#FILE_WINDOW_03),WindowHeight(#FILE_WINDOW_03)) : Resume_Window(#FILE_WINDOW_03)
+    Case #FILE_WINDOW_04 : Pause_Window(#FILE_WINDOW_04) : ResizeGadget(#FILE_WEBGADGET_04,0,0,WindowWidth(#FILE_WINDOW_04),WindowHeight(#FILE_WINDOW_04)) : Resume_Window(#FILE_WINDOW_04)
+    Case #FILE_WINDOW_05 : Pause_Window(#FILE_WINDOW_05) : ResizeGadget(#FILE_WEBGADGET_05,0,0,WindowWidth(#FILE_WINDOW_05),WindowHeight(#FILE_WINDOW_05)) : Resume_Window(#FILE_WINDOW_05)
+    Case #FILE_WINDOW_06 : Pause_Window(#FILE_WINDOW_06) : ResizeGadget(#FILE_WEBGADGET_06,0,0,WindowWidth(#FILE_WINDOW_06),WindowHeight(#FILE_WINDOW_06)) : Resume_Window(#FILE_WINDOW_06)
+    Case #FILE_WINDOW_07 : Pause_Window(#FILE_WINDOW_07) : ResizeGadget(#FILE_WEBGADGET_07,0,0,WindowWidth(#FILE_WINDOW_07),WindowHeight(#FILE_WINDOW_07)) : Resume_Window(#FILE_WINDOW_07)
+    Case #FILE_WINDOW_08 : Pause_Window(#FILE_WINDOW_08) : ResizeGadget(#FILE_WEBGADGET_08,0,0,WindowWidth(#FILE_WINDOW_08),WindowHeight(#FILE_WINDOW_08)) : Resume_Window(#FILE_WINDOW_08)
+    Case #FILE_WINDOW_09 : Pause_Window(#FILE_WINDOW_09) : ResizeGadget(#FILE_WEBGADGET_09,0,0,WindowWidth(#FILE_WINDOW_09),WindowHeight(#FILE_WINDOW_09)) : Resume_Window(#FILE_WINDOW_09)
+    Case #FILE_WINDOW_10 : Pause_Window(#FILE_WINDOW_10) : ResizeGadget(#FILE_WEBGADGET_10,0,0,WindowWidth(#FILE_WINDOW_10),WindowHeight(#FILE_WINDOW_10)) : Resume_Window(#FILE_WINDOW_10)
+      
+    Case #MAIN_WINDOW
+      
+      Protected gw.i, gh.i
+      Protected cw.i, ch.i
+      
+      Pause_Window(#MAIN_WINDOW)
+      
+      gh=WindowHeight(#MAIN_WINDOW)-MenuHeight()
+      gw=(gh/4)*5 
+      
+      ResizeGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+46,0,gw-40,gh+2) 
+      
+      cw=GadgetWidth(#MEDIA_CONTAINER)
+      ch=GadgetHeight(#MEDIA_CONTAINER)    
+      
+      ResizeGadget(#MAIN_LIST,2,2,(WindowWidth(#MAIN_WINDOW)-GadgetWidth(#MEDIA_CONTAINER))+4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59)
+      
+      ResizeGadget(#TITLE_GADGET ,        2,        2, (cw/2)   ,   (ch/2))
+      ResizeGadget(#SCREEN_GADGET,        2, (ch/2)+4, (cw/2)   , (ch/2)-8)
+      ResizeGadget(#BOXART_GADGET, (cw/2)+4,        2, (cw/2)-12,     ch-7)
+      
+      ResizeGadget(#FILTER_FRAME,2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,(GadgetWidth(#MAIN_LIST)/2)-2,50)
+      ResizeGadget(#MAIN_FILTER,6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,(GadgetWidth(#MAIN_LIST)/2)-10,24)
+      
+      ResizeGadget(#FLOPPY_FRAME,(GadgetWidth(#MAIN_LIST)/2)+2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,GadgetWidth(#MAIN_LIST)/2,50)
+      ResizeGadget(#MAIN_FLOPPY,(GadgetWidth(#MAIN_LIST)/2)+6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-34,(GadgetWidth(#MAIN_LIST)/2)-10,20)
+      
+      If IsImage(#TITLE_IMAGE)
+        CopyImage(#TITLE_IMAGE,#OUTPUT_IMAGE)
+        ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4,#PB_Image_Smooth)
+        StartDrawing(CanvasOutput(#TITLE_GADGET))
+        DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
+        StopDrawing()  
+        FreeImage(#OUTPUT_IMAGE)    
+      Else
+        Canvas_Blank(#TITLE_GADGET)
+      EndIf
+      
+      If IsImage(#SCREEN_IMAGE)      
+        CopyImage(#SCREEN_IMAGE,#OUTPUT_IMAGE)
+        ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4,#PB_Image_Raw)
+        StartDrawing(CanvasOutput(#SCREEN_GADGET))
+        DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4)
+        StopDrawing()  
+        FreeImage(#OUTPUT_IMAGE)
+      Else
+        Canvas_Blank(#SCREEN_GADGET)
+      EndIf
+      
+      If IsImage(#BOXART_IMAGE)      
+        CopyImage(#BOXART_IMAGE,#OUTPUT_IMAGE) 
+        If ListSize(Doc_List())>0
+          Scale_Boxart(#True)
+        Else
+          Scale_Boxart(#False)
+        EndIf 
+        FreeImage(#OUTPUT_IMAGE)
+      Else
+        Canvas_Blank(#BOXART_GADGET)
+      EndIf
+      
+      SetActiveGadget(#MAIN_LIST)
+      
+      Resume_Window(#MAIN_WINDOW)
+      
+      If GetWindowLongPtr_(GadgetID(#MAIN_LIST), #GWL_STYLE) & #WS_VSCROLL
+        SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-22)
+      Else
+        SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-6)
+      EndIf
+      
+      Get_Window_Sizes()
+      
+  EndSelect
+  
+EndProcedure
+
 Procedure Draw_Gadgets()
-    
-  ListIconGadget(#MAIN_LIST,2,2,410,WindowHeight(#MAIN_WINDOW)-MenuHeight()-59, "", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
   
   Protected gw.i, gh.i
   Protected cw.i, ch.i
@@ -1409,18 +1523,18 @@ Procedure Draw_Gadgets()
   gh=WindowHeight(#MAIN_WINDOW)-MenuHeight()
   gw=(gh/4)*5
   
-  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+46,0,gw-40,gh+2)
+  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+50,0,gw-50,gh+2)
   
   cw=GadgetWidth(#MEDIA_CONTAINER)
   ch=GadgetHeight(#MEDIA_CONTAINER)
   
-  CanvasGadget(#TITLE_GADGET ,        2,        2, (cw/2)   ,   (ch/2), #PB_Canvas_Border)
-  CanvasGadget(#SCREEN_GADGET,        2, (ch/2)+4, (cw/2)   , (ch/2)-8, #PB_Canvas_Border)
-  CanvasGadget(#BOXART_GADGET, (cw/2)+4,        2, (cw/2)-12,     ch-6, #PB_Canvas_Border)
+  CanvasGadget(#TITLE_GADGET ,        2,        2, (cw/2)  ,   (ch/2), #PB_Canvas_Border)
+  CanvasGadget(#SCREEN_GADGET,        2, (ch/2)+4, (cw/2)  , (ch/2)-8, #PB_Canvas_Border)
+  CanvasGadget(#BOXART_GADGET, (cw/2)+4,        2, (cw/2)-2,     ch-8, #PB_Canvas_Border)
   
   CloseGadgetList()
-    
-  ResizeGadget(#MAIN_LIST,2,2,(WindowWidth(#MAIN_WINDOW)-GadgetWidth(#MEDIA_CONTAINER))+4,#PB_Ignore)
+  
+  ListIconGadget(#MAIN_LIST,2,2,(WindowWidth(#MAIN_WINDOW)-GadgetWidth(#MEDIA_CONTAINER))+4,WindowHeight(#MAIN_WINDOW)-MenuHeight()-60, "", 100, #PB_ListIcon_GridLines | #LVS_NOCOLUMNHEADER | #PB_ListIcon_FullRowSelect)
   
   FrameGadget(#FILTER_FRAME,2,WindowHeight(#MAIN_WINDOW)-MenuHeight()-54,(GadgetWidth(#MAIN_LIST)/2)-2,50,"Filter (Press F10 For Search)")
   ComboBoxGadget(#MAIN_FILTER,6,WindowHeight(#MAIN_WINDOW)-MenuHeight()-36,(GadgetWidth(#MAIN_LIST)/2)-10,24)
@@ -1503,38 +1617,44 @@ Procedure Draw_Gadgets()
   MenuItem(#MenuItem_5, "Search Database"+Chr(9)+"F10",ImageID(#SEARCH_IMAGE))
   AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F10,#MenuItem_5)
   MenuItem(#MenuItem_4, "Refresh Database"+Chr(9)+"F5",ImageID(#REFRESH_IMAGE))
-  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F5,#MenuItem_4)
+  AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_F5,#MenuItem_4) 
+  MenuBar()
+  MenuItem(#MenuItem_10, "Save Settings",ImageID(#SAVE_IMAGE))
   MenuBar()
   MenuItem(#MenuItem_3, "Quit"+Chr(9)+"Ctrl+Q",ImageID(#CLOSE_IMAGE))
   AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_Control|#PB_Shortcut_Q,#MenuItem_3)  
   MenuTitle("Options")
+  OpenSubMenu("WinUAE Screen")
+  MenuItem(#MenuItem_14, "Full Screen")
+  MenuItem(#MenuItem_9, "Full-Window")
+  MenuItem(#MenuItem_15, "Windowed")
+  CloseSubMenu()
+  MenuBar()
+  MenuItem(#MenuItem_6,  "Show WinUAE GUI")
+  MenuItem(#MenuItem_19, "Show Scanlines")
+  MenuItem(#MenuItem_20, "Show LEDs")
+  MenuBar()
+  MenuItem(#MenuItem_17, "Floppy Sounds")
+  OpenSubMenu("Floppy Volume")
+  MenuItem(#MenuItem_23, "25%")
+  MenuItem(#MenuItem_24, "33%")
+  MenuItem(#MenuItem_25, "50%")
+  MenuItem(#MenuItem_26, "66%")
+  MenuItem(#MenuItem_27, "75%")
+  MenuItem(#MenuItem_28, "100%")
+  CloseSubMenu()
+  MenuBar()
+  MenuItem(#MenuItem_7,  "Swap End To F11")
+  MenuItem(#MenuItem_8,  "Use Alt+F4 To Close")
+  MenuBar()
   If Original_Names
     MenuItem(#MenuItem_18, "Use New Names")
   Else
     MenuItem(#MenuItem_18, "Use Original Names")
   EndIf
-  MenuBar()
-  MenuItem(#MenuItem_6, "Show WinUAE GUI")
-  OpenSubMenu("WinUAE Screen")
-  MenuItem(#MenuItem_14, "Full Screen")
-  MenuItem(#MenuItem_9, "Full Window")
-  MenuItem(#MenuItem_15, "Windowed")
-  CloseSubMenu()
-  MenuBar()
-  OpenSubMenu("Full Window Scaling")
-  MenuItem(#MenuItem_21, "Default")
-  MenuItem(#MenuItem_22, "Stretch")
-  CloseSubMenu()
-  MenuBar()
-  MenuItem(#MenuItem_19, "Show Scanlines")
-  MenuItem(#MenuItem_20, "Show LEDs")
-  MenuBar()
-  MenuItem(#MenuItem_7, "Stretch Window")
   MenuItem(#MenuItem_12, "Box Art Outline Colour",ImageID(#BORDER_IMAGE))
-  MenuBar()
   MenuItem(#MenuItem_11, "Close Confirmation")
-  MenuBar()
-  MenuItem(#MenuItem_10, "Save Settings",ImageID(#FOLDER_IMAGE))
+  
   MenuTitle("Help")
   MenuItem(#MenuItem_16, "Help"+Chr(9)+"F12",ImageID(#HELP_IMAGE))
   MenuItem(#MenuItem_2, "About",ImageID(#INFO_IMAGE))
@@ -1546,53 +1666,33 @@ Procedure Draw_Gadgets()
     Case 3 : SetMenuItemState(#MAIN_MENU,#MenuItem_15,Window_Type)
   EndSelect
   
-  SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
+  SetMenuItemState(#MAIN_MENU,#MenuItem_7,End_To_F11)
+  SetMenuItemState(#MAIN_MENU,#MenuItem_8,Alt_F4)
   SetMenuItemState(#MAIN_MENU,#MenuItem_19,Use_Scanlines)
   SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
   SetMenuItemState(#MAIN_MENU,#MenuItem_11,Close_Confirm)
-  
-  If FW_Scaling 
-    SetMenuItemState(#MAIN_MENU,#MenuItem_21,#False)
-    SetMenuItemState(#MAIN_MENU,#MenuItem_22,#True)
-  Else
-    SetMenuItemState(#MAIN_MENU,#MenuItem_21,#True)
-    SetMenuItemState(#MAIN_MENU,#MenuItem_22,#False)
-  EndIf
+  SetMenuItemState(#MAIN_MENU,#MenuItem_17,Floppy_Sounds)
+  SetMenuItemState(#MAIN_MENU,#MenuItem_22+Floppy_Volume,#True)
   
 EndProcedure
 
 Procedure Draw_Main_Window()
   
-  Protected winheight.i, winwidth.i, y.i, win_params
+  Protected Win_Params
   
-  ExamineDesktops()
+  Win_Params=#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget | #PB_Window_Invisible | #PB_Window_SizeGadget
   
-  If Stretch_Window
-    winheight=DesktopUnscaledY(GetMaxWindowHeight())
-    winwidth=(winheight/9)*16
-    If winwidth<1368 And DesktopWidth(0)>1280 : winwidth=1352 : EndIf
-    win_params=#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible
-  Else
-    If WinW<1280 : WinW=1280 : EndIf
-    If WinH<720 : WinH=720 : EndIf
-    winheight=DesktopUnscaledX(WinH)
-    winwidth=DesktopUnscaledY(WinW)
-    win_params=#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_Invisible | #PB_Window_ScreenCentered
-  EndIf
+  OpenWindow(#MAIN_WINDOW, WinX, WinY, WinW , WinH, W_Title , Win_Params)
   
-  OpenWindow(#MAIN_WINDOW, DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(winwidth)/2)-2), 5, winwidth , winheight-8, W_Title , win_params)
+  WindowBounds(#MAIN_WINDOW,1280,720,#PB_Ignore,#PB_Ignore)
+  
+  SetWindowState(#MAIN_WINDOW,WinMax)
   
   Draw_Gadgets()
   
-  CreateImage(#IFF_BLANK,DpiX(350), DpiY(564),32,#Black)
-  StartDrawing(ImageOutput(#IFF_BLANK))
-  FrontColor(#Red)
-  DrawText(0,0,"No Image")
-  StopDrawing()
-  StartDrawing(CanvasOutput(#TITLE_GADGET))
-  DrawImage(ImageID(#IFF_BLANK),0,0)
-  StopDrawing()
-  
+  BindEvent(#PB_Event_SizeWindow,@OnSizeWindow())
+  BindEvent(#PB_Event_MoveWindow,@OnMoveWindow())  
+
 EndProcedure
 
 Procedure Draw_List()
@@ -1621,9 +1721,9 @@ Procedure Draw_List()
   Resume_Gadget(#MAIN_LIST)
   
   If GetWindowLongPtr_(GadgetID(#MAIN_LIST), #GWL_STYLE) & #WS_VSCROLL
-    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-20)
+    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-22)
   Else
-    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-4)
+    SetGadgetItemAttribute(#MAIN_LIST,0,#PB_ListIcon_ColumnWidth,GadgetWidth(#MAIN_LIST)-6)
   EndIf
   
   SetActiveGadget(#MAIN_LIST)
@@ -1636,7 +1736,7 @@ Procedure Process_UAE()
   Protected NewList File_List.s()
   Protected NewList Old_Config.s()
   
-  Protected fileread$, output$, input$, answer$, KeepSet.b, progress_bar.i, old_gadget_list.i, text_info.i
+  Protected fileread$, output$, input$, answer$, KeepSet.b, progress_bar.i, old_gadget_list.i, text_info.i, params.l
   Protected F_HRes.s, F_VRes.s, W_HRes.s, W_VRes.s, Height.i, change.b, New_Path.s, Temp_Path.s, RTG_VRes.s, RTG_HRes.s
   Protected Scanlines.s, HiResScanlines.s, ScreenType.i, ScreenFilter.s, TurboFloppy.s, StretchScreen.s, AutoScale.s, RemoveOffset.s
   
@@ -1658,7 +1758,12 @@ Procedure Process_UAE()
     File_List()=Home_Path+"Configurations\"+DirectoryEntryName(0)
   Wend
   
-  OpenWindow(#PROGRESS_WINDOW,0,0,302,62,"Creating Database...",#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
+  If IsWindow(#MAIN_WINDOW)  
+    OpenWindow(#PROGRESS_WINDOW,0,0,302,62,"Creating Database...",#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
+  Else
+    OpenWindow(#PROGRESS_WINDOW,0,0,302,62,"Creating Database...",#PB_Window_ScreenCentered)
+  EndIf
+  
   StickyWindow(#PROGRESS_WINDOW,#True)
   old_gadget_list=UseGadgetList(WindowID(#PROGRESS_WINDOW))
   ImageGadget(#PB_Any,0,8,48,48,ImageID(#BUB_IMAGE))
@@ -1812,6 +1917,7 @@ Procedure Scrape_DB()
     If FindString(DD_List()\DD_Name,"[full game]") : DD_List()\DD_FullGame=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[full game]") : EndIf
     If FindString(DD_List()\DD_Name,"[2MB]") : DD_List()\DD_2MB=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[2MB]") : EndIf
     If FindString(DD_List()\DD_Name,"[4MB]") : DD_List()\DD_4MB=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[4MB]") : EndIf
+    If FindString(DD_List()\DD_Name,"[256 colour]") : DD_List()\DD_256_Color=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[256 colour]") : EndIf
     If FindString(DD_List()\DD_Name,"[D1X_Rebirth]") : DD_List()\DD_D1X=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[D1X_Rebirth]") : EndIf
     If FindString(DD_List()\DD_Name,"[MSX conversion]") : DD_List()\DD_MSX=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[MSX conversion]") : EndIf
     If FindString(DD_List()\DD_Name,"[MSX2 conversion]") : DD_List()\DD_MSX2=#True : DD_List()\DD_Name=RemoveString(DD_List()\DD_Name,"[MSX2 conversion]") : EndIf
@@ -1843,11 +1949,11 @@ Procedure Sort_List()
 EndProcedure
 
 Procedure MenuSelectColor(Event)
-  Define old_col=Box_Colour
+  Protected old_col=Box_Colour
   Box_Colour = ColorRequester()
   If Box_Colour = -1: Box_Colour=old_col : ProcedureReturn: EndIf  
   StartDrawing(ImageOutput(#BORDER_IMAGE))
-    Box(0,0,16,16,Box_Colour)
+  Box(0,0,16,16,Box_Colour)
   StopDrawing() 
 EndProcedure
 
@@ -1877,13 +1983,10 @@ If FileSize(".\Configurations\")=-2
   CatchImage(#INFO_IMAGE,?Info_Image)
   CatchImage(#HELP_IMAGE,?Help_Image)
   CatchImage(#IMAGE_IMAGE,?Image_Image)
+  CatchImage(#SAVE_IMAGE,?Save_Image)
   ResizeImage(#PDF_IMAGE,16,16)
   ResizeImage(#TEXT_IMAGE,16,16)
-  
-  Load_Prefs()
-    
-  Draw_Main_Window()
-  
+
   If FileSize(Home_Path+"DD_DB.dat")>0 And FileSize(Home_Path+"DD_CONFIGS.dat")>0
     Load_DB()
     Sort_List()
@@ -1892,8 +1995,24 @@ If FileSize(".\Configurations\")=-2
     Scrape_DB()
     Sort_List()
     Save_DB()
-  EndIf
+  EndIf    
   
+  ExamineDesktops()
+
+  Load_Prefs()  
+  
+  If WinY=-1
+    WinH=DesktopUnscaledY(GetMaxWindowHeight())-8
+    WinW=(WinH/9)*16
+    If WinW<1368 And DesktopWidth(0)>1280 : WinW=1352 : EndIf   
+    WinY=5
+    WinX=DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(WinW)/2)-2)
+  Else  
+    WinY=(DesktopUnscaledY(GetMaxWindowHeight())-WinH)/2
+    WinX=DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(WinW)/2)-2)
+  EndIf  
+ 
+  Draw_Main_Window()
   Draw_List()
   Draw_Info()
   
@@ -1914,7 +2033,7 @@ Repeat
   event=WaitWindowEvent()
   
   Select event
-
+      
     Case #WM_KEYDOWN
       If CountGadgetItems(#MAIN_LIST)>0
         If EventwParam() = #VK_RETURN
@@ -1966,6 +2085,8 @@ Repeat
         Case #MenuItem_4  ;{- Rescan Configs
           If MessageRequester("Warning", "Rescan Configurations?"+#CRLF$+#CRLF$+"All Data Will Be Lost!",#PB_MessageRequester_YesNo|#PB_MessageRequester_Warning)=#PB_MessageRequester_Yes
             If ListSize(DD_List())>0
+              SetWindowTitle(#MAIN_WINDOW,W_Title+" - Updating...")
+              Pause_Window(#MAIN_WINDOW)
               ClearList(DD_List())
               ClearList(List_Numbers())
               ClearGadgetItems(#MAIN_LIST)
@@ -1974,15 +2095,9 @@ Repeat
               Floppy_Speed=2
               SetGadgetText(#FLOPPY_FRAME,"Floppy Speed (100%)")
               SetGadgetState(#MAIN_FLOPPY,2)
-              StartDrawing(CanvasOutput(#TITLE_GADGET))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
-              StopDrawing()
-              StartDrawing(CanvasOutput(#SCREEN_GADGET))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4)
-              StopDrawing()
-              StartDrawing(CanvasOutput(#BOXART_GADGET))
-              DrawImage(ImageID(#IFF_BLANK),0,0,DpiX(GadgetWidth(#BOXART_GADGET))-4, DpiY(GadgetHeight(#BOXART_GADGET))-4)
-              StopDrawing()
+              Canvas_Blank(#TITLE_GADGET)
+              Canvas_Blank(#SCREEN_GADGET)
+              Canvas_Blank(#BOXART_GADGET)
               Window_Update()
               Process_UAE()
               Scrape_DB()
@@ -1993,6 +2108,7 @@ Repeat
               Draw_Info()
               SetGadgetState(#MAIN_LIST,0)
               SetActiveGadget(#MAIN_LIST)
+              Resume_Window(#MAIN_WINDOW)
             EndIf
           EndIf ;}
         Case #MenuItem_5  ;{- Search
@@ -2007,8 +2123,7 @@ Repeat
           SetGadgetState(#MAIN_LIST,0)
           Draw_Info()
           ;} 
-        Case #MenuItem_6  ;{- Show GUI
-          
+        Case #MenuItem_6  ;{- Show GUI       
           If Show_GUI
             Show_GUI=#False
           Else
@@ -2016,19 +2131,6 @@ Repeat
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_6,Show_GUI)
           ;}   
-        Case #MenuItem_7  ;{- Stretch Window
-          If Stretch_Window
-            Stretch_Window=#False
-          Else
-            Stretch_Window=#True
-          EndIf
-          SetMenuItemState(#MAIN_MENU,#MenuItem_7,Stretch_Window)
-          CloseWindow(#MAIN_WINDOW)
-          Draw_Main_Window()
-          Draw_List()
-          Draw_Info()
-          HideWindow(#MAIN_WINDOW,#False)
-          ;} 
         Case #MenuItem_14 ;{- Full Screen
           Window_Type=1
           SetMenuItemState(#MAIN_MENU,#MenuItem_14,#True)
@@ -2076,7 +2178,79 @@ Repeat
             Original_Names=#True
           EndIf
           Draw_List()
-          ;}        
+          ;}  
+        Case #MenuItem_7  ;{- End To F11
+          If End_To_F11
+            End_To_F11=#False
+          Else
+            End_To_F11=#True
+          EndIf
+          SetMenuItemState(#MAIN_MENU,#MenuItem_7,End_To_F11)
+          ;} 
+        Case #MenuItem_8  ;{- Alt + F4
+          If Alt_F4
+            Alt_F4=#False
+          Else
+            Alt_F4=#True
+          EndIf
+          SetMenuItemState(#MAIN_MENU,#MenuItem_8,Alt_F4)
+          ;} 
+        Case #MenuItem_17 ;{- Floppy Sounds
+          If Floppy_Sounds
+            Floppy_Sounds=#False
+            For i=0 To 5
+              DisableMenuItem(#MAIN_MENU,#MenuItem_23+i,#True)
+            Next  
+          Else
+            Floppy_Sounds=#True
+            For i=0 To 5
+              DisableMenuItem(#MAIN_MENU,#MenuItem_23+i,#False)
+            Next 
+          EndIf
+          SetMenuItemState(#MAIN_MENU,#MenuItem_17,Floppy_Sounds)
+          ;}
+        Case #MenuItem_23 ;{- Floppy Volume
+          Floppy_Volume=1
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_23,#True)
+          ;}
+        Case #MenuItem_24 ;{- Floppy Volume
+          Floppy_Volume=2
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_24,#True)
+          ;}
+        Case #MenuItem_25 ;{- Floppy Volume
+          Floppy_Volume=3
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_25,#True)
+          ;}
+        Case #MenuItem_26 ;{- Floppy Volume
+          Floppy_Volume=4
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_26,#True)
+          ;}
+        Case #MenuItem_27 ;{- Floppy Volume
+          Floppy_Volume=5
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_27,#True)
+          ;}
+        Case #MenuItem_28 ;{- Floppy Volume
+          Floppy_Volume=6
+          For i=0 To 5
+            SetMenuItemState(#MAIN_MENU,#MenuItem_23+i,#False)
+          Next  
+          SetMenuItemState(#MAIN_MENU,#MenuItem_28,#True)
+          ;}
         Case #MenuItem_19 ;{- Scanlines toggle
           If Use_Scanlines
             Use_Scanlines=#False
@@ -2093,17 +2267,6 @@ Repeat
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
           SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
-          ;}
-        Case #MenuItem_21, #MenuItem_22 ;{- Fullwindow Scaling
-          If FW_Scaling
-            FW_Scaling=#False 
-            SetMenuItemState(#MAIN_MENU,#MenuItem_21,#True)
-            SetMenuItemState(#MAIN_MENU,#MenuItem_22,#False)
-          Else
-            FW_Scaling=#True
-            SetMenuItemState(#MAIN_MENU,#MenuItem_21,#False)
-            SetMenuItemState(#MAIN_MENU,#MenuItem_22,#True)
-          EndIf
           ;}
         Case 900 To 930 : File_Viewer(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+GetMenuItemText(#POPUP_MENU,EventMenu()))
       EndSelect
@@ -2174,18 +2337,7 @@ Repeat
       EndSelect
       
     Case #PB_Event_SizeWindow
-      Select EventWindow()
-        Case #FILE_WINDOW_01 : ResizeGadget(#FILE_WEBGADGET_01,0,0,WindowWidth(#FILE_WINDOW_01),WindowHeight(#FILE_WINDOW_01))
-        Case #FILE_WINDOW_02 : ResizeGadget(#FILE_WEBGADGET_02,0,0,WindowWidth(#FILE_WINDOW_02),WindowHeight(#FILE_WINDOW_02))
-        Case #FILE_WINDOW_03 : ResizeGadget(#FILE_WEBGADGET_03,0,0,WindowWidth(#FILE_WINDOW_03),WindowHeight(#FILE_WINDOW_03))
-        Case #FILE_WINDOW_04 : ResizeGadget(#FILE_WEBGADGET_04,0,0,WindowWidth(#FILE_WINDOW_04),WindowHeight(#FILE_WINDOW_04))
-        Case #FILE_WINDOW_05 : ResizeGadget(#FILE_WEBGADGET_05,0,0,WindowWidth(#FILE_WINDOW_05),WindowHeight(#FILE_WINDOW_05))
-        Case #FILE_WINDOW_06 : ResizeGadget(#FILE_WEBGADGET_06,0,0,WindowWidth(#FILE_WINDOW_06),WindowHeight(#FILE_WINDOW_06))
-        Case #FILE_WINDOW_07 : ResizeGadget(#FILE_WEBGADGET_07,0,0,WindowWidth(#FILE_WINDOW_07),WindowHeight(#FILE_WINDOW_07))
-        Case #FILE_WINDOW_08 : ResizeGadget(#FILE_WEBGADGET_08,0,0,WindowWidth(#FILE_WINDOW_08),WindowHeight(#FILE_WINDOW_08))
-        Case #FILE_WINDOW_09 : ResizeGadget(#FILE_WEBGADGET_09,0,0,WindowWidth(#FILE_WINDOW_09),WindowHeight(#FILE_WINDOW_09))
-        Case #FILE_WINDOW_10 : ResizeGadget(#FILE_WEBGADGET_10,0,0,WindowWidth(#FILE_WINDOW_10),WindowHeight(#FILE_WINDOW_10))
-      EndSelect
+      
       
     Case #PB_Event_CloseWindow
       Select EventWindow()
@@ -2254,30 +2406,33 @@ DataSection
   Image_Image:
   IncludeBinary "image.png"
   
+  Save_Image:
+  IncludeBinary "save.png"
+  
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 4 (Windows - x64)
-; CursorPosition = 166
-; FirstLine = 135
-; Folding = AAAAgAAA5
+; CursorPosition = 1965
+; FirstLine = 883
+; Folding = AAgYMAAAAg
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDLaunch64.exe
+; Executable = I:\WinUAE\DDLaunch.exe
 ; CommandLine = -c "demo"
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x64)
+; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x86)
 ; Debugger = Standalone
 ; IncludeVersionInfo
-; VersionField0 = 1.4.0.0
-; VersionField1 = 1.4.0.0
+; VersionField0 = 1.5.0.0
+; VersionField1 = 1.5.0.0
 ; VersionField2 = MrV2k
 ; VersionField3 = DDLaunch
-; VersionField4 = 1.4
-; VersionField5 = 1.4
-; VersionField6 = Game Launcher For Damien D's Collection
+; VersionField4 = 1.5
+; VersionField5 = 1.5
+; VersionField6 = DDLaunch v1.5
 ; VersionField7 = DDLaunch
 ; VersionField8 = DDLaunch
 ; VersionField9 = 2022 Paul Vince
