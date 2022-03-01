@@ -1,56 +1,64 @@
 About
 -----
 
-DDLaunch is a frontend for DamienD's collection of Amiga games. It was designed to
-remove the need to use the WinUAE interface to start the games. It also adds
-filters and a bit of extra functionality as well.
+DDLaunch is a frontend for DamienD's collection of Amiga games. It was 
+designed to remove the need to use the WinUAE interface to start the games. It 
+also adds filters and a bit of extra functionality as well.
 
 Installation
 ------------
+In the archive there are 32 and 64bit versions of the the executable which 
+you can install depending on your OS. The DDLaunch file needs to be put in 
+the WinUAE folder that was extracted from the DamienD collection archives. If 
+you wish to use this help file in DDLaunch, copy it into the WinUAE folder as
+well.
 
-In the archive there are 32 and 64bit versions of the the executable which you can
-install depending on your OS. The DDLaunch file needs to be put in the WinUAE
-folder that was extracted from the DamienD collection archives.
-
-When you launch the program for the first time, it will create a database of the
-game folder and process the configuration files to make them compatible with the
-launcher. These are stored in DD_CONFIGS.dat and DD_DB.dat which are saved in the
-WinUAE folder. This process will take a few minutes.
+When you launch the program for the first time, it will create a database of 
+the game folder and process the configuration files to make them compatible 
+with the launcher. These are stored in DD_CONFIGS.dat and DD_DB.dat which are 
+saved in the WinUAE folder. This process will take a few minutes.
 
 Optional Files
 --------------
 
-DDlaunch has a built in PDF viewer. For this to work properly you will need to
-install Adobe Acrobat, FoxIt Pro or equivalent web plugin. If they are not
-installed, the window will show a download popup and open the file in your default
-PDF reader. 
+DDlaunch has a built in file viewer that can show any support documents 
+included with the games. Most formats are supported, but to view PDF files in 
+the viewer, you will need to install Adobe Acrobat, FoxIt Pro or an equivalent 
+web plugin. If a PDF plugin is not installed, the window will show a download 
+popup and open the file in your default PDF reader.
 
 Main Window
 -----------
 
-The main window is split into two sections, the game list and the media panel.
+DDLaunch's GUI is fully resizeable and will remember the window location and 
+size when closed. These settings are stored in the 'DD_Launch.prefs' file in the 
+WinUAE folder. The media panel has a fixed ratio so the images are shown at 
+the correct aspect.
 
-** Game List **
-In the game list you will see the list of installed games. To run a game, just
-double click it. You can also right click anywhere on the DDLaunch window and a
-popup menu will appear which also allows you to run the game, open the game folder
-or access any documentation that is in the game folder.
+The window is split into two sections, the configurations list and the media panel.
+
+** Configuration List **
+In the config list, you will see the list of installed games. To run a game, 
+just double click it. You can also right click anywhere on the DDLaunch window 
+and a popup menu will appear which also allows you to run the game, open the 
+game folder or access any documentation that is in the game folder.
 
 ** Filter **
 This drop-down menu allows you to filter the games list by category. Also,
 pressing F10 will open a search window.
 
 ** Floppy Speed **
-A lot of the games are run off of an emulated floppy disk. This option allows you
-to change the speed of the floppy drive.
+A lot of the games are run off of an emulated floppy disk. This option allows 
+you to change the speed of the floppy drive.
 
 ** Media Panel **
 In this panel you will see any game art supplied in the collection. You can
 double click any of the panels to open them in a larger window. Double clicking
 or pressing Escape will close the zoomed picture.
 
-If the game has any extra documentation, you will see a document icon in the top
-right corner of the cover art panel. Use the popup menu to access these documents.
+If the game has any extra documentation, you will see a document icon in the 
+top right corner of the cover art panel. Use the popup menu to access these 
+documents.
 
 Menus
 -----
@@ -60,26 +68,38 @@ Run Game		- Launches the currently selected game.
 Open Game Folder	- Opens the folder for selected game.
 Search Database		- Opens a window to allow you to search the database.
 Refresh Database	- Clears and rescans the configuration data.
-Quit			- Quits DDLaunch
+Save Settings 		- Saves the current settings.
+Quit			- Quits DDLaunch.
 
 ** Options **
-Show WinUAE GUI 	- Opens WinUAE with the game selected. This allows you to
-			  change any settings.
 WinUAE Screen 		- Allows you to choose how WinUAE displays the game. You
-			  can pick between Full Screen, Full Window or Windowed.
-Stretch Window 		- Expands the GUI vertically to the full desktop height.
-Compact/Wide Window 	- Changes the layout of the GUI
-Box Art Outline Col 	- Changes the outline colour of the boxart image
-Save Settings 		- Saves the current settings
+			  can pick between Full Screen, Full-Window or Windowed.
+Show WinUAE GUI 	- Opens the WinUAE GUI allowing you to change any settings.
+Show Scanlines 		- Toggles the scanline effect in WinUAE.
+Show LEDs	 	- Toggles the onscreen LEDs in WinUAE.
+Floppy Sounds 		- Toggles the WinUAE's floppy sound simulation.
+Floppy Volume 		- Sets the volume of the floppy sounds.
+Swap End To F11 	- Swap the disk swapper shortcut key from End to F11
+			  for laptop keyboards.
+Use Alt + F4 To Close	- Sets the WinUAE quit key combination to Alt+F4. 
+Use New/Original Names  - Sets the config list names to either my naming or the 
+			  original config names created by DamienD.
+Box Art Outline Colour	- Changes the outline colour of the boxart image.
+Close Confirmation      - Toggles the close confirmation window when you quit
+                          DDLaunch.
 
 ** Help **
-About 			- DDLaunch info.
 Help 			- Shows this file.
+About 			- DDLaunch info.
+
 
 Keyboard Shortcuts
 ------------------
 
-** GUI Keys **
+*******************
+** DDLaunch Keys **
+*******************
+
 F1  			- Zoom Title Image
 F2  			- Zoom Game Image
 F3  			- Zoom Box Art
@@ -90,12 +110,44 @@ F12 			- Help
 Enter 			- Run Game
 Ctrl & Q 		- Quit
 Crtl & +/- 		- Zoom File Viewer
+Arrow Up 		- Increase Zoom Window Size
+Arrow Down 		- Decrease Zoom Window Size
+Escape 			- Close Zoom Window
 
+*****************
 ** WinUAE Keys **
-Ctrl & F11        	- Quit
-End & 1-9         	- Swap Disk
-End 7 Pause/Break 	- Turbo Mode
-F12               	- Settings
+*****************
+
+Key                                 Function
+---------------------------------	------------------------------
+<F12>                               Bring up GUI
+<CTRL> + <F12>                      Toggle Fullscreen / Windowed
+<CTRL> + <F11>                      Quit WinUAE
+<LEFT CTRL> + <WINDOWS> + <MENU>    Reset Amiga
+<LEFT CTRL> + <INSERT> + <HOME>     *same as above*
+<END> + <PAUSE>                     Toggle Warp Mode
+<PAGE DOWN>                         Amiga <Help> Key
+  
+Changing Disks
+--------------
+<END> + <F1>    Insert disk into DF0
+<END> + <F2>    Insert disk into DF1
+<END> + <F3>    Insert disk into DF2
+<END> + <F4>    Insert disk into DF3
+
+Ejecting Disks
+--------------
+<END> + <SHIFT> + <F1>    Eject disk in DF0
+<END> + <SHIFT> + <F2>    Eject disk in DF1
+<END> + <SHIFT> + <F3>    Eject disk in DF2
+<END> + <SHIFT> + <F4>    Eject disk in DF3
+   
+Disk Swapper
+------------
+<END> + <1-0>               Insert disk from swapper slot 1-10
+<END> + <SHIFT> + <1-0>     Insert disk from swapper slot 11-20
+<END> + <CTRL> + <1-4>      Select drive
+
 
 Version History
 ---------------
@@ -196,13 +248,15 @@ Version History
  
  v1.0 - Full Release
  -------------------
- 1. Removed program wait on procedure Run_Game and added threaded cleanup process.
+ 1. Removed program wait on procedure Run_Game and added threaded cleanup 
+    process.
  2. Added check to prevent starting two WinUAE processes.
  
  v1.1
  -----
  1. Tweaked list sorting.
- 2. Added menu item to select between original names or new names. Saves in prefs.
+ 2. Added menu item to select between original names or new names. Saves in
+    prefs.
  3. Added a few more filters.
  
  v1.2
@@ -214,13 +268,13 @@ Version History
  5. Cover images maintain aspect ratios and now reduce width if necessary.
  6. Cover image popup window scales to images and maintains aspect ratio.
  7. Combined the text & pdf viewers by using a browser based gadget.
- 8. DDLaunch allows 10 file view windows at any one time. A check prevents more to
-    be opened.
+ 8. DDLaunch allows 10 file view windows at any one time. A check prevents more
+    to be opened.
  9. Converted DDLaunch.txt to be 80 columns.
  10. Added support for png and jpg images to the file viewer and popup menu.
  11. Popup menu now supports up to 30 files.
- 12. Moved configuration folder check to prevent any files being created if there
-     was an error.
+ 12. Moved configuration folder check to prevent any files being created if
+     there was an error.
 
  v1.3
  -----
@@ -230,5 +284,49 @@ Version History
  4. Tweaked gadget drawing.
  5. Removed unnecessary font load.
  6. Removed AmiDuke from filter
- 7. Added JFDuke3d, Sharp X6800 conversion and PET version to the filter.
+ 7. Added JFDuke3d, Sharp X68000 conversion and PET version to the filter.
 
+ v1.4
+ -----
+ 1. Added menu switch to turn scanlines on or off. Saved in prefs.
+ 2. Added menu switch to turn the in-game LEDs on or off. Saved in prefs.
+ 3. Fixed box art border colour loading from the prefs file.
+ 4. Removed compact mode
+ 5. Stretch window now automatically resizes to your desktop size. If your
+    monitor aspect is over 16:9, the window ratio is limited to 16:9.
+ 6. All gadgets automatically resize to the window.
+ 7. Fixed floppy speed frame showing the wrong percentage when starting the
+    program.
+ 8. Added Wii and Megadrive conversion to the filter.
+ 9. Renamed and removed a couple of filters on DD's request.
+ 10. Slightly sped up config scrape procedure.
+ 11. Config list automatically resizes if there is a vertical scrollbar.
+ 12. Fixed bug in config list drawing that stopped alternate line backgrounds
+     if the filter was used.
+ 13. Added default window width and height to prefs. Change these settings to 
+     change the default window size. Minimum is 1280 wide x 720 high. 
+ 14. Updated help file to reflect menu and GUI changes.
+ 
+ v1.5
+ -----
+ 1. Fixed image and image gadget scaling.
+ 2. Changed and added some icons to the menus.
+ 3. Full window game screen width scales to the desktop resolution.
+ 4. Scanline width adapts to vertical desktop resolution.
+ 5. Fixed JFDuke3D error in scrape procedure.
+ 6. Minimum window size is 1280x720.
+ 7. GUI is now fully resizable and supports Windows maximize and scaling.
+ 8. Added zoom to image popup. Zoom size is saved in the prefs file.
+ 9. Added right click menu to image popup.
+ 10. Removed 'Stretch Window' as no longer necessary.
+ 11. Window size and position is now saved in prefs file.
+ 12. File viewer window now has a minimum size of 700x600.
+ 13. Added 'Swap End To F11' menu option and run program parameters.
+ 14. Added 'Use Alt + F4 to close' menu option and run program parameters
+ 15. Removed a few more unnecessary procedures.
+ 16. Improved and optimized the info loading procedure. 
+ 17. Added floppy sounds and volume menu options and run program parameters.
+ 18. Updated DDLaunch.txt file to reflect all the GUI changes.
+ 19. Removed 'Full-Window Stretch' as the game screen position is no longer an issue due to 
+     dynamic screen aspect ratio.
+ 20. Added a fixed window size for DD's laptop at 1366x768 resolution.
