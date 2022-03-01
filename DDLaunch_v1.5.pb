@@ -161,14 +161,14 @@
 ; v1.5
 ; -----
 ; 1. Fixed image and image gadget scaling.
-; 2. Full window image scaling now changeable between default and stretched.
-; 3. Full window image width scales to the desktop resolution.
+; 2. Changed and added some icons to the menus.
+; 3. Full window game screen width scales to the desktop resolution.
 ; 4. Scanline width adapts to vertical desktop resolution.
-; 5. Added icon to border colour menu entry.
-; 6. Fixed JFDuke3D error in scrape procedure.
-; 7. Minimum/Default window size is now 1280x720.
-; 8. Changed 'Save Settings' icon and moved to file menu.
-; 9. GUI is now fully resizable and supports Windows maximize and scaling.
+; 5. Fixed JFDuke3D error in scrape procedure.
+; 6. Minimum window size is 1280x720.
+; 7. GUI is now fully resizable and supports Windows maximize and scaling.
+; 8. Added zoom to image popup. Zoom size is saved in the prefs file.
+; 9. Added right click menu to image popup.
 ; 10. Removed 'Stretch Window' as no longer necessary.
 ; 11. Window size and position is now saved in prefs file.
 ; 12. File viewer window now has a minimum size of 700x600.
@@ -178,7 +178,8 @@
 ; 16. Improved and optimized the info loading procedure. 
 ; 17. Added floppy sounds and volume menu options and run program parameters.
 ; 18. Updated DDLaunch.txt file to reflect all the GUI changes.
-; 19. Removed 'Full-Window Stretch' as the game screen position is no longer an issue due to fixed screen aspect ratio.
+; 19. Removed 'Full-Window Stretch' as the game screen position is no longer an issue due to dynamic screen aspect ratio.
+; 20. Added a fixed window size for DD's laptop at 1366x768 resolution.
 
 EnableExplicit
 
@@ -207,6 +208,14 @@ Enumeration
   #SIZE_HEIGHT_STRING
   #SIZE_OK_BUTTON
   #SIZE_CANCEL_BUTTON
+  
+  #IMAGE_POPUP_MENU
+  #OUTPUT_POPUP 
+  #ZOOM_IN_IMAGE
+  #ZOOM_OUT_IMAGE
+  #Popup_a
+  #Popup_b
+  #Popup_c
   
   #POPUP_WINDOW
   #PROGRESS_WINDOW
@@ -252,6 +261,8 @@ Enumeration
   #IMAGE_IMAGE
   #SAVE_IMAGE
   #BORDER_IMAGE
+  #MONITOR_IMAGE
+  #DISK_IMAGE
   
   #MAIN_MENU
   #POPUP_MENU
@@ -351,6 +362,7 @@ Global WinH=720
 Global WinX=-1
 Global WinY=-1
 Global WinMax=0
+Global Popup_Zoom.f=0.8
 
 ;- **** Structures ****
 
@@ -481,6 +493,36 @@ Macro Get_Window_Sizes()
   WinY=WindowY(#MAIN_WINDOW)   
   WinW=WindowWidth(#MAIN_WINDOW)
   WinH=WindowHeight(#MAIN_WINDOW)
+  
+EndMacro
+
+Macro W_Scale()
+  
+  CopyImage(#IFF_POPUP,#OUTPUT_POPUP)
+    
+  ww=Int(ImageWidth(#OUTPUT_POPUP)*zoom)
+  wh=Int(ImageHeight(#OUTPUT_POPUP)*zoom)
+  wx=(WindowX(#MAIN_WINDOW)+(WindowWidth(#MAIN_WINDOW))/2)-(ww/2)   ; Centered Image X
+  wy=(WindowY(#MAIN_WINDOW)+(WindowHeight(#MAIN_WINDOW))/2)-(wh/2)+MenuHeight() ; Centered Image Y  
+  iw=DpiX(ww)
+  ih=DpiY(wh)
+  
+  Pause_Window(#POPUP_WINDOW)
+  
+  ResizeImage(#OUTPUT_POPUP,iw, ih,#PB_Image_Smooth)
+  ResizeWindow(#POPUP_WINDOW,wx,wy,ww,wh)
+  ResizeGadget(popup_imagegadget,0,0,ww,wh)
+  StartDrawing(CanvasOutput(popup_imagegadget))
+  DrawImage(ImageID(#OUTPUT_POPUP),0,0)
+  StopDrawing()
+  
+  Window_Update()
+  
+  Resume_Window(#POPUP_WINDOW)
+  
+  SetActiveWindow(#POPUP_WINDOW)
+  
+  HideWindow(#MAIN_WINDOW,#False)
   
 EndMacro
 
@@ -1028,7 +1070,7 @@ Procedure Run_Game()
   Select DRes
       
     Case "5120x1440" : width_scale="1.000000"
-    Case "3840x2160" : width_scale="1.500000"
+    Case "3840x2160" : width_scale="3.250000"
     Case "3840x1080" : width_scale="0.750000"
     Case "2560x1440" : width_scale="2.000000"
     Case "2560x1080" : width_scale="1.125000"
@@ -1147,20 +1189,19 @@ EndProcedure
 
 Procedure Image_Popup(type.i)
   
-  Protected popup_imagegadget, pevent, popup_image, ww.i, wh.i
+  Protected popup_imagegadget, pevent, popup_image, ww.i, wh.i, wx.i, wy.i, ih.i, iw.i, zoom.f, scale.f
   
   Get_Game_Number()
   
   DisableWindow(#MAIN_WINDOW,#True)
+
+  zoom=Popup_Zoom
   
   path=""
   
   If type=1
     If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")>0
       path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png"
-    EndIf
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.jpg")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.jpg"
     EndIf
     ww=720 : wh=568
   EndIf
@@ -1169,63 +1210,94 @@ Procedure Image_Popup(type.i)
     If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")>0
       path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png"
     EndIf
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.jpg")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.jpg"
-    EndIf
     ww=720 : wh=568
   EndIf
   
   If type=3
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.png")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.png"
-    EndIf
     If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
       path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg"
     EndIf
-    ww=550
-    wh=700
+    ww=550 : wh=700
   EndIf
-  
-  Protected scale.f, backg, x
-  
+
   If path="" : CopyImage(#IFF_BLANK, #IFF_POPUP) : EndIf
+  
   LoadImage(#IFF_POPUP,path)  
+  
   If IsImage(#IFF_POPUP)
+    
     ResizeImgAR(#IFF_POPUP,DpiX(ww), DpiY(wh))
-    backg=CreateImage(#PB_Any,ImageWidth(#IFF_POPUP), ImageHeight(#IFF_POPUP),32,#Black)
-    StartDrawing(ImageOutput(backg))
-    DrawImage(ImageID(#IFF_POPUP),0,0)
-    StopDrawing()
-    ww=ImageWidth(backg)
-    wh=ImageHeight(backg)
-    If OpenWindow(#POPUP_WINDOW,0,0,DesktopUnscaledX(ww),DesktopUnscaledY(wh),"",#PB_Window_BorderLess|#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
+    
+    ww=ImageWidth(#IFF_POPUP)
+    wh=ImageHeight(#IFF_POPUP)
+    
+    If OpenWindow(#POPUP_WINDOW,0,0,0,0,"",#PB_Window_BorderLess|#PB_Window_Invisible)
       StickyWindow(#POPUP_WINDOW,#True)
       SetClassLongPtr_(WindowID(#POPUP_WINDOW),#GCL_STYLE,$00020000) ; Add Drop Shadow
-      ImageGadget(popup_imagegadget,0,0,ww,wh,ImageID(backg))
+      
+      CanvasGadget(popup_imagegadget,0,0,ww,wh)      
+      W_Scale()
+      
+      CreatePopupImageMenu(#IMAGE_POPUP_MENU)
+      MenuItem(#Popup_a,"Zoom +"+Chr(9)+"Arrow Up",ImageID(#ZOOM_IN_IMAGE))
+      AddKeyboardShortcut(#POPUP_WINDOW,#PB_Shortcut_Up,#Popup_a)
+      MenuItem(#Popup_b,"Zoom -"+Chr(9)+"Arrow Down",ImageID(#ZOOM_OUT_IMAGE))
+      AddKeyboardShortcut(#POPUP_WINDOW,#PB_Shortcut_Down,#Popup_b)
+      MenuBar()
+      MenuItem(#Popup_c,"Close"+Chr(9)+"Esc",ImageID(#CLOSE_IMAGE))
+      AddKeyboardShortcut(#POPUP_WINDOW,#PB_Shortcut_Escape,#Popup_c)
       
       Repeat 
+        
         pevent=WaitWindowEvent()
         
-        If pevent=#WM_KEYUP
-          If EventwParam() = #VK_ESCAPE
-            Break
-          EndIf
-        EndIf
-        
-        If EventGadget() = popup_imagegadget
-          If EventType()=#PB_EventType_LeftDoubleClick
-            Break
-          EndIf
-        EndIf
+        Select pevent      
+            
+          Case #PB_Event_Gadget
+            
+            If EventGadget() = popup_imagegadget
+              If EventType()=#PB_EventType_LeftDoubleClick
+                Break
+              EndIf
+              If EventType()=#PB_EventType_RightClick
+                DisplayPopupMenu(#IMAGE_POPUP_MENU,WindowID(#POPUP_WINDOW))
+              EndIf
+            EndIf
+            
+          Case #PB_Event_Menu
+            
+            Select EventMenu()
+                
+              Case #Popup_a
+                If zoom<1.51
+                  zoom+0.10 
+                  W_Scale()
+                EndIf                                  
+
+              Case #Popup_b
+                If zoom>0.49
+                  zoom-0.10
+                  W_Scale()
+                EndIf
+
+              Case #Popup_c
+                Break
+                
+            EndSelect
+        EndSelect
       ForEver
       
       CloseWindow(#POPUP_WINDOW)
       FreeImage(#IFF_POPUP)
+      FreeImage(#OUTPUT_POPUP)
+      FreeMenu(#IMAGE_POPUP_MENU)
       DisableWindow(#MAIN_WINDOW,#False)
       SetActiveGadget(#MAIN_LIST)
-      
+   
     EndIf
   EndIf
+  
+  Popup_Zoom=zoom
   
 EndProcedure
 
@@ -1305,6 +1377,7 @@ Procedure Save_Prefs()
     WriteStringN(0,"Window_X="+WinX)
     WriteStringN(0,"Window_Y="+WinY)
     WriteStringN(0,"Window_Max="+GetWindowState(#MAIN_WINDOW))
+    WriteStringN(0,"Popup_Zoom="+Popup_Zoom)
     CloseFile(0)
   EndIf 
   
@@ -1334,6 +1407,7 @@ Procedure Load_Prefs()
       If FindString(input$,"Window_X=") : WinX=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Window_Y=") : WinY=Val(StringField(input$,2,Chr(61))) : EndIf
       If FindString(input$,"Window_Max=") : WinMax=Val(StringField(input$,2,Chr(61))) : EndIf
+      If FindString(input$,"Popup_Zoom=") : Popup_Zoom=ValF(StringField(input$,2,Chr(61))) : EndIf
     Wend
     CloseFile(0)
   Else
@@ -1523,7 +1597,7 @@ Procedure Draw_Gadgets()
   gh=WindowHeight(#MAIN_WINDOW)-MenuHeight()
   gw=(gh/4)*5
   
-  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+50,0,gw-50,gh+2)
+  ContainerGadget(#MEDIA_CONTAINER,(WindowWidth(#MAIN_WINDOW)-gw)+46,0,gw-40,gh+2)
   
   cw=GadgetWidth(#MEDIA_CONTAINER)
   ch=GadgetHeight(#MEDIA_CONTAINER)
@@ -1624,7 +1698,7 @@ Procedure Draw_Gadgets()
   MenuItem(#MenuItem_3, "Quit"+Chr(9)+"Ctrl+Q",ImageID(#CLOSE_IMAGE))
   AddKeyboardShortcut(#MAIN_WINDOW,#PB_Shortcut_Control|#PB_Shortcut_Q,#MenuItem_3)  
   MenuTitle("Options")
-  OpenSubMenu("WinUAE Screen")
+  OpenSubMenu("WinUAE Screen",ImageID(#MONITOR_IMAGE))
   MenuItem(#MenuItem_14, "Full Screen")
   MenuItem(#MenuItem_9, "Full-Window")
   MenuItem(#MenuItem_15, "Windowed")
@@ -1635,7 +1709,7 @@ Procedure Draw_Gadgets()
   MenuItem(#MenuItem_20, "Show LEDs")
   MenuBar()
   MenuItem(#MenuItem_17, "Floppy Sounds")
-  OpenSubMenu("Floppy Volume")
+  OpenSubMenu("Floppy Volume",ImageID(#DISK_IMAGE))
   MenuItem(#MenuItem_23, "25%")
   MenuItem(#MenuItem_24, "33%")
   MenuItem(#MenuItem_25, "50%")
@@ -1684,7 +1758,7 @@ Procedure Draw_Main_Window()
   
   OpenWindow(#MAIN_WINDOW, WinX, WinY, WinW , WinH, W_Title , Win_Params)
   
-  WindowBounds(#MAIN_WINDOW,1280,720,#PB_Ignore,#PB_Ignore)
+  WindowBounds(#MAIN_WINDOW,1280,680,#PB_Ignore,#PB_Ignore)
   
   SetWindowState(#MAIN_WINDOW,WinMax)
   
@@ -1954,12 +2028,16 @@ Procedure MenuSelectColor(Event)
   If Box_Colour = -1: Box_Colour=old_col : ProcedureReturn: EndIf  
   StartDrawing(ImageOutput(#BORDER_IMAGE))
   Box(0,0,16,16,Box_Colour)
+  DrawingMode(#PB_2DDrawing_Outlined)
+  Box(0,0,16,16,#Black)
   StopDrawing() 
 EndProcedure
 
 If CreateImage(#BORDER_IMAGE,16,16,24,Box_Colour)
   StartDrawing(ImageOutput(#BORDER_IMAGE))
   Box(0,0,16,16,Box_Colour)
+    DrawingMode(#PB_2DDrawing_Outlined)
+  Box(0,0,16,16,#Black)
   StopDrawing()
 EndIf
 
@@ -1984,6 +2062,10 @@ If FileSize(".\Configurations\")=-2
   CatchImage(#HELP_IMAGE,?Help_Image)
   CatchImage(#IMAGE_IMAGE,?Image_Image)
   CatchImage(#SAVE_IMAGE,?Save_Image)
+  CatchImage(#MONITOR_IMAGE,?Screen_Image)
+  CatchImage(#DISK_IMAGE,?Disk_Image)
+  CatchImage(#ZOOM_IN_IMAGE,?ZoomIn_Image)
+  CatchImage(#ZOOM_OUT_IMAGE,?ZoomOut_Image)
   ResizeImage(#PDF_IMAGE,16,16)
   ResizeImage(#TEXT_IMAGE,16,16)
 
@@ -1998,20 +2080,21 @@ If FileSize(".\Configurations\")=-2
   EndIf    
   
   ExamineDesktops()
-
-  Load_Prefs()  
   
-  If WinY=-1
-    WinH=DesktopUnscaledY(GetMaxWindowHeight())-8
-    WinW=(WinH/9)*16
-    If WinW<1368 And DesktopWidth(0)>1280 : WinW=1352 : EndIf   
-    WinY=5
-    WinX=DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(WinW)/2)-2)
+  If DesktopWidth(0)=1366
+    WinH=DesktopUnscaledY(GetMaxWindowHeight())-9
+    WinW=1350
+    WinY=0
+    WinX=4
   Else  
+    WinW=1280
+    WinH=720
     WinY=(DesktopUnscaledY(GetMaxWindowHeight())-WinH)/2
-    WinX=DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(WinW)/2)-2)
-  EndIf  
- 
+    WinX=DesktopUnscaledX((DesktopWidth(0)/2)-(DpiX(WinW)/2))
+  EndIf
+  
+  Load_Prefs()  
+
   Draw_Main_Window()
   Draw_List()
   Draw_Info()
@@ -2198,14 +2281,8 @@ Repeat
         Case #MenuItem_17 ;{- Floppy Sounds
           If Floppy_Sounds
             Floppy_Sounds=#False
-            For i=0 To 5
-              DisableMenuItem(#MAIN_MENU,#MenuItem_23+i,#True)
-            Next  
           Else
             Floppy_Sounds=#True
-            For i=0 To 5
-              DisableMenuItem(#MAIN_MENU,#MenuItem_23+i,#False)
-            Next 
           EndIf
           SetMenuItemState(#MAIN_MENU,#MenuItem_17,Floppy_Sounds)
           ;}
@@ -2368,6 +2445,9 @@ Save_Prefs()
 
 End
 
+
+;- **** Data Section ****
+
 DataSection
   
   PDF_Image:
@@ -2407,14 +2487,26 @@ DataSection
   IncludeBinary "image.png"
   
   Save_Image:
-  IncludeBinary "save.png"
+  IncludeBinary "disk.png"
+  
+  Screen_Image:
+  IncludeBinary "screen.png"
+  
+  Disk_Image:
+  IncludeBinary "volume.png"
+  
+  ZoomIn_Image:
+  IncludeBinary "zoom-in.png"
+  
+  ZoomOut_Image:
+  IncludeBinary "zoom-out.png"
   
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 4 (Windows - x64)
-; CursorPosition = 1965
-; FirstLine = 883
-; Folding = AAgYMAAAAg
+; CursorPosition = 2282
+; FirstLine = 479
+; Folding = AAAAAAAAAA-
 ; Optimizer
 ; EnableThread
 ; EnableXP
