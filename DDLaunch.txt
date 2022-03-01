@@ -314,7 +314,7 @@ Version History
  3. Full window game screen width scales to the desktop resolution.
  4. Scanline width adapts to vertical desktop resolution.
  5. Fixed JFDuke3D error in scrape procedure.
- 6. Minimum window size is 1280x720.
+ 6. Minimum window size is 1280x680.
  7. GUI is now fully resizable and supports Windows maximize and scaling.
  8. Added zoom to image popup. Zoom size is saved in the prefs file.
  9. Added right click menu to image popup.
