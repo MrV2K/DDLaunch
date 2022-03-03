@@ -330,3 +330,8 @@ Version History
  19. Removed 'Full-Window Stretch' as the game screen position is no longer an issue due to 
      dynamic screen aspect ratio.
  20. Added a fixed window size for DD's laptop at 1366x768 resolution.
+
+ v1.6
+ -----
+ 1. Floppy volume now applies to all 4 drives.
+ 2. Added 10% volume to floppy volume menu.
