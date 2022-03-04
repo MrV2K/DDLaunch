@@ -185,6 +185,9 @@
 ; -----
 ; 1. Floppy volume now applies to all 4 drives.
 ; 2. Added 10% volume to floppy volume menu.
+; 3. Improved the config scan routine.
+; 4. Sped up the image drawing procedure even more.
+; 5. Moved blank image drawing to a macro to improve speed.
 
 EnableExplicit
 
@@ -377,6 +380,7 @@ Structure DD_Data
   DD_Config.s
   DD_Sort.s
   DD_Folder.s
+  DD_Path.s
   DD_FullGame.b
   DD_Shapeshifter.b
   DD_RTG.b
@@ -532,7 +536,64 @@ Macro W_Scale()
   
 EndMacro
 
+Macro Canvas_Blank(gadget)
+  
+  StartDrawing(CanvasOutput(gadget))  
+  Box(0,0,DpiX(GadgetWidth(gadget)),DpiY(GadgetHeight(gadget)),#Black)
+  FrontColor(#Red)
+  DrawText(5,5,"No Image")
+  StopDrawing()
+  
+EndMacro
+
+Macro Draw_Image(d_image,d_gadget,extension)
+  LoadImage(d_image,DD_List()\DD_Path+DD_List()\DD_Folder+"\"+extension)
+  CopyImage(d_image,#OUTPUT_IMAGE)
+  ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(d_gadget))-4, DpiY(GadgetHeight(d_gadget))-4,#PB_Image_Smooth)
+  StartDrawing(CanvasOutput(d_gadget))
+  DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(d_gadget))-4, DpiY(GadgetHeight(d_gadget))-4)
+  StopDrawing()  
+  FreeImage(#OUTPUT_IMAGE)  
+EndMacro
+
 ;- **** Procedures ****
+
+Procedure List_Files_Recursive(Dir.s, List Files.s(), Extension.s) ; <------> Adds All Files In A Folder Into The Supplied List
+  
+  Protected NewList Directories.s()
+  
+  Protected FOLDER_LIST
+  
+  If Right(Dir, 1) <> Chr(92)
+    Dir + Chr(92)
+  EndIf
+  
+  If ExamineDirectory(FOLDER_LIST, Dir, Extension)
+    While NextDirectoryEntry(FOLDER_LIST)
+      Select DirectoryEntryType(FOLDER_LIST)
+        Case #PB_DirectoryEntry_File
+          AddElement(Files())
+          Files() = Dir + DirectoryEntryName(FOLDER_LIST)
+          Window_Update()
+        Case #PB_DirectoryEntry_Directory
+          Select DirectoryEntryName(FOLDER_LIST)
+            Case ".", ".."
+              Continue
+            Default
+              AddElement(Directories())
+              Directories() = Dir + DirectoryEntryName(FOLDER_LIST)
+          EndSelect
+      EndSelect
+    Wend
+    FinishDirectory(FOLDER_LIST)
+    ForEach Directories()
+      List_Files_Recursive(Directories(), Files(), Extension)
+    Next
+  EndIf 
+  
+  FreeList(Directories())
+  
+EndProcedure
 
 Procedure GetMaxWindowHeight()
   
@@ -942,16 +1003,6 @@ Procedure Scale_Boxart(dox.b)
   
 EndProcedure
 
-Procedure Canvas_Blank(gadget.l)
-  
-  StartDrawing(CanvasOutput(gadget))  
-  Box(0,0,DpiX(GadgetWidth(gadget)),DpiY(GadgetHeight(gadget)),#Black)
-  FrontColor(#Red)
-  DrawText(5,5,"No Image")
-  StopDrawing()
-  
-EndProcedure
-
 Procedure Draw_Info()
   
   Protected Info_Dir.i
@@ -964,8 +1015,8 @@ Procedure Draw_Info()
   If IsImage(#SCREEN_IMAGE) : FreeImage(#SCREEN_IMAGE) : EndIf
   If IsImage(#BOXART_IMAGE) : FreeImage(#BOXART_IMAGE) : EndIf
   If IsMenu(#POPUP_MENU) : FreeMenu(#POPUP_MENU) : EndIf  
-    
-  Info_Dir=ExamineDirectory(#PB_Any,Home_Path+"Games\"+DD_List()\DD_Folder+"\","*.*")
+  
+  Info_Dir=ExamineDirectory(#PB_Any,DD_List()\DD_Path+DD_List()\DD_Folder+"\","*.*")
   
   While NextDirectoryEntry(Info_Dir)
     If DirectoryEntryType(Info_Dir)=#PB_DirectoryEntry_File
@@ -996,33 +1047,21 @@ Procedure Draw_Info()
   EndIf
   
   If ListSize(List_Numbers())>0
-    
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")>0
-      LoadImage(#TITLE_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")
-      CopyImage(#TITLE_IMAGE,#OUTPUT_IMAGE)
-      ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4,#PB_Image_Smooth)
-      StartDrawing(CanvasOutput(#TITLE_GADGET))
-      DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#TITLE_GADGET))-4, DpiY(GadgetHeight(#TITLE_GADGET))-4)
-      StopDrawing()  
-      FreeImage(#OUTPUT_IMAGE)    
+
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Title.png")>0
+      Draw_Image(#TITLE_IMAGE,#TITLE_GADGET,"___Title.png") 
     Else
       Canvas_Blank(#TITLE_GADGET)
     EndIf
     
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")>0
-      LoadImage(#SCREEN_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")        
-      CopyImage(#SCREEN_IMAGE,#OUTPUT_IMAGE)
-      ResizeImage(#OUTPUT_IMAGE,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4,#PB_Image_Raw)
-      StartDrawing(CanvasOutput(#SCREEN_GADGET))
-      DrawImage(ImageID(#OUTPUT_IMAGE),0,0,DpiX(GadgetWidth(#SCREEN_GADGET))-4, DpiY(GadgetHeight(#SCREEN_GADGET))-4)
-      StopDrawing()  
-      FreeImage(#OUTPUT_IMAGE)
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___SShot.png")>0
+      Draw_Image(#SCREEN_IMAGE,#SCREEN_GADGET,"___SShot.png")
     Else
       Canvas_Blank(#SCREEN_GADGET)
     EndIf
     
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
-      LoadImage(#BOXART_IMAGE,Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")         
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
+      LoadImage(#BOXART_IMAGE,DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Boxart.jpg")         
       CopyImage(#BOXART_IMAGE,#OUTPUT_IMAGE)
       If ListSize(Doc_List())>0
         Scale_Boxart(#True)
@@ -1095,13 +1134,17 @@ Procedure Run_Game()
   
   Select Floppy_Speed
     Case 1 : floppy=" -s floppy_speed=0"
-    Case 2 : floppy=""
+    Case 2 : floppy=" -s floppy_speed=100"
     Case 3 : floppy=" -s floppy_speed=200"
     Case 4 : floppy=" -s floppy_speed=400"
     Case 5 : floppy=" -s floppy_speed=800"
   EndSelect
   
-  If Show_GUI : gui=" -cfgparam use_gui=yes" : Else  : gui="" : EndIf
+  If Show_GUI
+    gui=" -cfgparam use_gui=yes"
+  Else
+    gui=" -cfgparam use_gui=no"
+  EndIf
   
   params=""
   
@@ -1141,11 +1184,17 @@ Procedure Run_Game()
   If Not Use_Scanlines
     params+" -cfgparam gfx_filter_scanlines=0"
     params+" -cfgparam gfx_filter_scanlines_rtg=0"
+  Else
+    params+" -cfgparam gfx_filter_scanlines=1"
+    params+" -cfgparam gfx_filter_scanlines_rtg=1"
   EndIf
   
   If Not Show_Leds
     params+" -cfgparam show_leds=0"
     params+" -cfgparam show_leds_rtg=0"
+  Else 
+    params+" -cfgparam show_leds=1"
+    params+" -cfgparam show_leds_rtg=1"
   EndIf
   
   If End_To_F11
@@ -1157,6 +1206,8 @@ Procedure Run_Game()
   
   If Alt_F4
     params+" -cfgparam win32.ctrl_f11_is_quit=false"
+  Else
+    params+" -cfgparam win32.ctrl_f11_is_quit=true"
   EndIf
   
   If Floppy_Sounds
@@ -1181,9 +1232,13 @@ Procedure Run_Game()
     params+" -cfgparam floppy2soundvolume_empty="+F_Vol
     params+" -cfgparam floppy3soundvolume_disk="+F_Vol
     params+" -cfgparam floppy3soundvolume_empty="+F_Vol
+  Else
+    params+" -cfgparam floppy0sound=0"
+    params+" -cfgparam floppy1sound=0"
+    params+" -cfgparam floppy2sound=0"
+    params+" -cfgparam floppy3sound=0"    
   EndIf
-        
-  
+
   full_path="-f "+#DOUBLEQUOTE$+GetTemporaryDirectory()+DD_List()\DD_Config+".uae"+#DOUBLEQUOTE$+floppy+gui+params
   
   program=RunProgram(WinUAE_Path, full_path ,"",#PB_Program_Open)
@@ -1213,22 +1268,22 @@ Procedure Image_Popup(type.i)
   path=""
   
   If type=1
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Title.png"
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Title.png")>0
+      path=DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Title.png"
     EndIf
     ww=720 : wh=568
   EndIf
   
   If type=2
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___SShot.png"
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___SShot.png")>0
+      path=DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___SShot.png"
     EndIf
     ww=720 : wh=568
   EndIf
   
   If type=3
-    If FileSize(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
-      path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"+"___Boxart.jpg"
+    If FileSize(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Boxart.jpg")>0
+      path=DD_List()\DD_Path+DD_List()\DD_Folder+"\"+"___Boxart.jpg"
     EndIf
     ww=550 : wh=700
   EndIf
@@ -1822,6 +1877,7 @@ EndProcedure
 Procedure Process_UAE()
   
   Protected NewList File_List.s()
+  Protected NewList Temp_List.s()
   Protected NewList Old_Config.s()
   
   Protected fileread$, output$, input$, answer$, KeepSet.b, progress_bar.i, old_gadget_list.i, text_info.i, params.l
@@ -1840,17 +1896,13 @@ Procedure Process_UAE()
   Temp_Path=GetTemporaryDirectory()+"DD_Temp\"
   New_Path=ReplaceString(Home_Path,Chr(92),Chr(92)+Chr(92))
   
-  ExamineDirectory(0,Home_Path+"Configurations\","*.uae")
-  While NextDirectoryEntry(0)
-    AddElement(File_List())
-    File_List()=Home_Path+"Configurations\"+DirectoryEntryName(0)
-  Wend
-  
   If IsWindow(#MAIN_WINDOW)  
     OpenWindow(#PROGRESS_WINDOW,0,0,302,62,"Creating Database...",#PB_Window_WindowCentered,WindowID(#MAIN_WINDOW))
   Else
     OpenWindow(#PROGRESS_WINDOW,0,0,302,62,"Creating Database...",#PB_Window_ScreenCentered)
-  EndIf
+  EndIf  
+  
+  List_Files_Recursive(Home_Path+"Configurations\",File_List(),"*.*")
   
   StickyWindow(#PROGRESS_WINDOW,#True)
   old_gadget_list=UseGadgetList(WindowID(#PROGRESS_WINDOW))
@@ -1861,81 +1913,90 @@ Procedure Process_UAE()
   If CreatePack(0,Home_Path+"DD_CONFIGS.dat",#PB_PackerPlugin_BriefLZ)
     
     ForEach File_List()
-      
-      AddElement(DD_List())
-      DD_List()\DD_Config=GetFilePart(File_List(),#PB_FileSystem_NoExtension)
-      DD_List()\DD_Name=GetFilePart(File_List(),#PB_FileSystem_NoExtension)
-      If ReadFile(0,File_List(),#PB_Ascii)
-        
-        If Mod(ListIndex(File_List()),10)=0
-          SetGadgetState(progress_bar,ListIndex(File_List()))
-          Window_Update()
-        EndIf
-        
-        While Not Eof(0)
-          AddElement(Old_Config())
-          Old_Config()=ReadString(0)
-        Wend
-        
-        CloseFile(0)
-        
-        If CreateFile(1,Temp_Path+GetFilePart(File_List()),#PB_Ascii)
+      If GetExtensionPart(File_List())="uae"
+        AddElement(DD_List())
+        DD_List()\DD_Config=GetFilePart(File_List(),#PB_FileSystem_NoExtension)
+        DD_List()\DD_Name=GetFilePart(File_List(),#PB_FileSystem_NoExtension)
+        DD_List()\DD_Path=ReplaceString(GetPathPart(File_List()),"Configurations","Games")
+        If ReadFile(0,File_List(),#PB_Ascii)
           
-          ForEach Old_Config()
-            If FindString(Old_Config(),"floppy0=")
-              If StringField(Old_Config(),2,Chr(61))<>""
-                DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92))
-              EndIf
-            EndIf
+          If Mod(ListIndex(File_List()),10)=0
+            SetGadgetState(progress_bar,ListIndex(File_List()))
+            Window_Update()
+          EndIf
+          
+          While Not Eof(0)
+            AddElement(Old_Config())
+            Old_Config()=ReadString(0)
+          Wend
+          
+          CloseFile(0)
+          
+          If CreateFile(1,Temp_Path+GetFilePart(File_List()),#PB_Ascii)
             
-            If FindString(Old_Config(),"cdimage0=")
-              If StringField(Old_Config(),2,Chr(61))<>""
-                DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92))
-              EndIf
-            EndIf
-            
-            If FindString(Old_Config(),"hardfile2=")
-              If StringField(Old_Config(),2,Chr(61))<>""
-                If FindString(Old_Config(),".\\")
-                  DD_List()\DD_Folder=StringField(Old_Config(),5,Chr(92))
+            ForEach Old_Config()
+              If FindString(Old_Config(),"floppy0=")
+                If StringField(Old_Config(),2,Chr(61))<>""
+                  DD_List()\DD_Folder=StringField(Old_Config(),CountString(Old_Config(),Chr(92)),Chr(92))
                 EndIf
-                If FindString(Old_Config(),".\") And DD_List()\DD_Folder="" : DD_List()\DD_Folder=StringField(Old_Config(),3,Chr(92)) : EndIf
               EndIf
-            EndIf
-            
-            If FindString(Old_Config(),".\\",#PB_String_NoCase)
-              If FindString(Old_Config(),"hardfile",#PB_String_NoCase) Or FindString(Old_Config(),"uaehf",#PB_String_NoCase)
-                Old_Config()=ReplaceString(Old_Config(),".\\",New_Path)          
-              Else
-                Old_Config()=ReplaceString(Old_Config(),".\\",Home_Path)
+              
+              If FindString(Old_Config(),"cdimage0=")
+                If StringField(Old_Config(),2,Chr(61))<>""
+                  DD_List()\DD_Folder=StringField(Old_Config(),CountString(Old_Config(),Chr(92)),Chr(92))
+                EndIf
               EndIf
-            EndIf
-            
-            If FindString(Old_Config(),".\",#PB_String_NoCase)
-              If FindString(Old_Config(),"hardfile",#PB_String_NoCase) Or FindString(Old_Config(),"uaehf",#PB_String_NoCase)
-                Old_Config()=ReplaceString(Old_Config(),".\",New_Path)          
-              Else
-                Old_Config()=ReplaceString(Old_Config(),".\",Home_Path)
+              
+              If FindString(Old_Config(),"hardfile2=")
+                If StringField(Old_Config(),2,Chr(61))<>""
+                  If FindString(Old_Config(),".\\")
+                    DD_List()\DD_Folder=StringField(Old_Config(),CountString(Old_Config(),Chr(92))-1,Chr(92))
+                  EndIf
+                  If FindString(Old_Config(),".\") And DD_List()\DD_Folder="" : DD_List()\DD_Folder=StringField(Old_Config(),CountString(Old_Config(),Chr(92)),Chr(92)) : EndIf
+                EndIf
               EndIf
-            EndIf
+              
+              If FindString(Old_Config(),".\\",#PB_String_NoCase)
+                If FindString(Old_Config(),"hardfile",#PB_String_NoCase) Or FindString(Old_Config(),"uaehf",#PB_String_NoCase)
+                  Old_Config()=ReplaceString(Old_Config(),".\\",New_Path)          
+                Else
+                  Old_Config()=ReplaceString(Old_Config(),".\\",Home_Path)
+                EndIf
+              EndIf
+              
+              If FindString(Old_Config(),".\",#PB_String_NoCase)
+                If FindString(Old_Config(),"hardfile",#PB_String_NoCase) Or FindString(Old_Config(),"uaehf",#PB_String_NoCase)
+                  Old_Config()=ReplaceString(Old_Config(),".\",New_Path)          
+                Else
+                  Old_Config()=ReplaceString(Old_Config(),".\",Home_Path)
+                EndIf
+              EndIf
+              
+              If FindString(Old_Config(),"use_gui=", #PB_String_NoCase) : Old_Config()="use_gui=no" : EndIf
+              
+              WriteStringN(1,Old_Config())
+            Next
             
-            If FindString(Old_Config(),"use_gui=", #PB_String_NoCase) : Old_Config()="use_gui=no" : EndIf
+            FlushFileBuffers(1) 
+            CloseFile(1)
+            ClearList(Old_Config())
             
-            WriteStringN(1,Old_Config())
-          Next
-          
-          FlushFileBuffers(1) 
-          CloseFile(1)
-          ClearList(Old_Config())
-          
-        EndIf 
-        AddPackFile(0,Temp_Path+GetFilePart(File_List()),GetFilePart(File_List()))
-        DeleteFile(Temp_Path+GetFilePart(File_List()))
+          EndIf 
+          AddPackFile(0,Temp_Path+GetFilePart(File_List()),GetFilePart(File_List()))
+          DeleteFile(Temp_Path+GetFilePart(File_List()))
+        EndIf
       EndIf
+      
     Next
     
   EndIf
   
+  ForEach DD_List()
+    If DD_List()\DD_Folder=""
+      DeleteElement(DD_List())
+    EndIf
+  Next
+    
   ClosePack(0)
   
   DeleteDirectory(Temp_Path,"*.*",#PB_FileSystem_Force)
@@ -2025,9 +2086,9 @@ Procedure Sort_List()
   
   ForEach DD_List()
     path=DD_List()\DD_Name
-    path=RemoveString(path,"-",#PB_String_NoCase)
-    path=RemoveString(path,"'",#PB_String_NoCase)
-    path=ReplaceString(path,"(","*",#PB_String_NoCase)
+    path=RemoveString(path,Chr(45),#PB_String_NoCase)
+    path=RemoveString(path,Chr(39),#PB_String_NoCase)
+    path=ReplaceString(path,Chr(40),Chr(42),#PB_String_NoCase)
     path=ReplaceString(path,"XBox","vbox",#PB_String_NoCase)
     DD_List()\DD_Sort=LCase(path)
   Next 
@@ -2263,7 +2324,7 @@ Repeat
           ;}
         Case #MenuItem_13 ;{- Open Game Folder
           Get_Game_Number()
-          path=Home_Path+"Games\"+DD_List()\DD_Folder+"\"
+          path=DD_List()\DD_Path+DD_List()\DD_Folder+"\"
           RunProgram("file://"+path)
           ;}
         Case #MenuItem_18 ;{- Name Toggle
@@ -2366,7 +2427,7 @@ Repeat
           SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
           SetMenuItemState(#MAIN_MENU,#MenuItem_20,Show_Leds)
           ;}
-        Case 900 To 930 : File_Viewer(Home_Path+"Games\"+DD_List()\DD_Folder+"\"+GetMenuItemText(#POPUP_MENU,EventMenu()))
+        Case 900 To 930 : File_Viewer(DD_List()\DD_Path+DD_List()\DD_Folder+"\"+GetMenuItemText(#POPUP_MENU,EventMenu()))
       EndSelect
       
     Case #PB_Event_Gadget
@@ -2525,18 +2586,18 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.00 Beta 4 (Windows - x64)
-; CursorPosition = 183
-; FirstLine = 154
-; Folding = AAAAAAAAwf+
+; CursorPosition = 188
+; FirstLine = 161
+; Folding = AAAAAAAAAA5
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDLaunch64.exe
+; Executable = I:\WinUAE\DDLaunch.exe
 ; CommandLine = -c "demo"
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x64)
+; Compiler = PureBasic 6.00 Beta 4 - C Backend (Windows - x86)
 ; Debugger = Standalone
 ; IncludeVersionInfo
 ; VersionField0 = 1.6.0.0
