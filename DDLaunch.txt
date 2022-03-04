@@ -335,3 +335,8 @@ Version History
  -----
  1. Floppy volume now applies to all 4 drives.
  2. Added 10% volume to floppy volume menu.
+ 3. Improved the config scan routine.
+ 4. Sped up the image drawing procedure even more.
+ 5. Moved blank image drawing to a macro to improve speed.
+ 6. Added uHexen2 to the filter.
+ 7. Added a few more categories to the scrape procedure.
