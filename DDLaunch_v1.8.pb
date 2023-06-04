@@ -1171,14 +1171,15 @@ Procedure Run_Game()
   
   Select Window_Type
       
-    Case 1
+    Case 1 ; Fullscreen
       
       If Not Use_Scanlines
         params+" -cfgparam gfx_filter_scanlines=0"
         params+" -cfgparam gfx_filter_scanlines_rtg=0"
       EndIf
       
-    Case 2
+    Case 2 ; Full Window
+      
       params+" -cfgparam gfx_fullscreen_amiga=fullwindow"
       params+" -cfgparam gfx_fullscreen_picasso=fullwindow"
       params+" -cfgparam win32.rtg_scale_aspect_ratio="
@@ -1202,11 +1203,17 @@ Procedure Run_Game()
       
       params+" -cfgparam gfx_filter_vert_offsetf=0"
       
-    Case 3
+    Case 3 ; Windowed
+      
+      If Not Use_Scanlines
+        params+" -cfgparam gfx_filter_scanlines=0"
+        params+" -cfgparam gfx_filter_scanlines_rtg=0"
+      EndIf
+      
       params+" -cfgparam win32.statusbar=none"
       params+" -cfgparam gfx_fullscreen_amiga=false"
       params+" -cfgparam gfx_fullscreen_picasso=false"
-      params+" -cfgparam gfx_filter_aspect_ratio=-1:-1"
+      ;params+" -cfgparam gfx_filter_aspect_ratio=-1:-1"
       params+" -cfgparam gfx_width_windowed=720"
       params+" -cfgparam gfx_height_windowed=568"
       
@@ -2254,10 +2261,10 @@ Repeat
           EndIf;}
         Case #MenuItem_2  ;{- About
           If #PB_Compiler_Processor=#PB_Processor_x64
-            MessageRequester("About", W_Title+" (64Bit Version)"+#CRLF$+#CRLF$+"© 2022 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
+            MessageRequester("About", W_Title+" (64Bit Version)"+#CRLF$+#CRLF$+"© 2023 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
           EndIf
           If #PB_Compiler_Processor=#PB_Processor_x86
-            MessageRequester("About", W_Title+" (32Bit Version)"+#CRLF$+#CRLF$+"© 2022 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
+            MessageRequester("About", W_Title+" (32Bit Version)"+#CRLF$+#CRLF$+"© 2023 Paul Vince (MrV2K)",#PB_MessageRequester_Info|#PB_MessageRequester_Ok)
           EndIf
           ;}
         Case #MenuItem_16 ;{- Help
@@ -2616,18 +2623,18 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.02 LTS (Windows - x64)
-; CursorPosition = 1184
-; FirstLine = 803
+; CursorPosition = 1220
+; FirstLine = 818
 ; Folding = AAEEAAAAAA5
 ; Optimizer
 ; EnableThread
 ; EnableXP
 ; DPIAware
 ; UseIcon = dd.ico
-; Executable = I:\WinUAE\DDLaunch64.exe
+; Executable = I:\WinUAE\DDLaunch.exe
 ; CommandLine = -c "demo"
 ; CurrentDirectory = I:\WinUAE\
-; Compiler = PureBasic 6.02 LTS - C Backend (Windows - x64)
+; Compiler = PureBasic 6.02 LTS - C Backend (Windows - x86)
 ; Debugger = Standalone
 ; IncludeVersionInfo
 ; VersionField0 = 1.7.0.0
