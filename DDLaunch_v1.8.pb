@@ -198,6 +198,7 @@
 ; v1.8
 ; -----
 ; 1. Fixed scanlines not turning on or off from menu.
+; 2. Fixed a scaling issue in windowed mode.
 ;
 EnableExplicit
 
@@ -2623,8 +2624,8 @@ DataSection
 EndDataSection
 
 ; IDE Options = PureBasic 6.02 LTS (Windows - x64)
-; CursorPosition = 1220
-; FirstLine = 818
+; CursorPosition = 200
+; FirstLine = 168
 ; Folding = AAEEAAAAAA5
 ; Optimizer
 ; EnableThread
